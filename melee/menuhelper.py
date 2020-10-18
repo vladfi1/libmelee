@@ -11,9 +11,12 @@ class MenuHelper():
     inputs_live = False
 
     def menu_helper_simple(gamestate,
-                            controller,
-                            port,
-                            character_selected,
+                            controller_1,
+                            controller_2,
+                            port_1,
+                            port_2,
+                            character_1_selected,
+                            character_2_selected,
                             stage_selected,
                             connect_code,
                             autostart=False,
@@ -38,29 +41,36 @@ class MenuHelper():
         if gamestate.menu_state in [enums.Menu.CHARACTER_SELECT, enums.Menu.SLIPPI_ONLINE_CSS]:
             if gamestate.submenu == enums.SubMenu.NAME_ENTRY_SUBMENU:
                 MenuHelper.name_tag_index = MenuHelper.enter_direct_code(gamestate=gamestate,
-                                                           controller=controller,
+                                                           controller=controller_1,
                                                            connect_code=connect_code,
                                                            index=MenuHelper.name_tag_index)
             else:
-                MenuHelper.choose_character(character=character_selected,
+                print("choosing character")
+                MenuHelper.choose_character(character=character_1_selected,
                                             gamestate=gamestate,
-                                            port=port,
-                                            controller=controller,
+                                            port=port_1,
+                                            controller=controller_1,
+                                            swag=True,
+                                            start=autostart)
+                MenuHelper.choose_character(character=character_2_selected,
+                                            gamestate=gamestate,
+                                            port=port_2,
+                                            controller=controller_2,
                                             swag=True,
                                             start=autostart)
         # If we're at the postgame scores screen, spam START
         elif gamestate.menu_state == enums.Menu.POSTGAME_SCORES:
-            MenuHelper.skip_postgame(controller=controller)
+            MenuHelper.skip_postgame(controller=controller_1)
         # If we're at the stage select screen, choose a stage
         elif gamestate.menu_state == enums.Menu.STAGE_SELECT:
             MenuHelper.choose_stage(stage=stage_selected,
                                     gamestate=gamestate,
-                                    controller=controller)
+                                    controller=controller_1)
         elif gamestate.menu_state == enums.Menu.MAIN_MENU:
             if connect_code:
-                MenuHelper.choose_direct_online(gamestate=gamestate, controller=controller)
+                MenuHelper.choose_direct_online(gamestate=gamestate, controller=controller_1)
             else:
-                MenuHelper.choose_versus_mode(gamestate=gamestate, controller=controller)
+                MenuHelper.choose_versus_mode(gamestate=gamestate, controller=controller_1)
 
     def enter_direct_code(gamestate, controller, connect_code, index):
         """At the nametag entry screen, enter the given direct connect code and exit
@@ -195,6 +205,8 @@ class MenuHelper():
         #Wiggle room in positioning character
         wiggleroom = 1.5
 
+        print("one")
+
         # We are already set, so let's taunt our opponent
         if character_selected == character and swag and not start:
             delta_x = 3 * math.cos(gamestate.frame / 1.5)
@@ -223,19 +235,27 @@ class MenuHelper():
             controller.tilt_analog(enums.Button.BUTTON_MAIN, x, y)
             return
 
+        print("two")
+
         if character_selected == character and swag and isSlippiCSS:
             controller.press_button(enums.Button.BUTTON_START)
             return
+
+        print("three")
 
         #We want to get to a state where the cursor is NOT over the character,
         # but it's selected. Thus ensuring the token is on the character
         isOverCharacter = abs(cursor_x - target_x) < wiggleroom and \
             abs(cursor_y - target_y) < wiggleroom
 
+        print("four")
+
         #Don't hold down on B, since we'll quit the menu if we do
         if controller.prev.button[enums.Button.BUTTON_B] == True:
             controller.release_button(enums.Button.BUTTON_B)
             return
+
+        print("five")
 
         #If character is selected, and we're in of the area, and coin is down, then we're good
         if (character_selected == character) and coin_down:
@@ -246,11 +266,14 @@ class MenuHelper():
                 controller.release_all()
                 return
 
+        print("six")
+
         #release start in addition to anything else
         controller.release_button(enums.Button.BUTTON_START)
 
         #If we're in the right area, select the character
         if isOverCharacter:
+            print("seven")
             #If we're over the character, but it isn't selected,
             #   then the coin must be somewhere else.
             #   Press B to reclaim the coin
@@ -281,22 +304,27 @@ class MenuHelper():
                     controller.release_button(enums.Button.BUTTON_A)
                     return
         else:
+            print("eight")
             #Move in
             controller.release_button(enums.Button.BUTTON_A)
             #Move up if we're too low
             if cursor_y < target_y - wiggleroom:
+                print("move up")
                 controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, 1)
                 return
             #Move down if we're too high
             if cursor_y > target_y + wiggleroom:
+                print("move down")
                 controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, 0)
                 return
             #Move right if we're too left
             if cursor_x < target_x - wiggleroom:
+                print("move left")
                 controller.tilt_analog(enums.Button.BUTTON_MAIN, 1, .5)
                 return
             #Move left if we're too right
             if cursor_x > target_x + wiggleroom:
+                print("move right")
                 controller.tilt_analog(enums.Button.BUTTON_MAIN, 0, .5)
                 return
         controller.release_all()

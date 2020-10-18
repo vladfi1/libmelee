@@ -71,7 +71,8 @@ controller = melee.Controller(console=console,
 
 controller_opponent = melee.Controller(console=console,
                                        port=args.opponent,
-                                       type=melee.ControllerType.GCN_ADAPTER)
+                                       type=melee.ControllerType.STANDARD,
+                                       ai=True)
 
 # This isn't necessary, but makes it so that Dolphin will get killed when you ^C
 def signal_handler(sig, frame):
@@ -88,7 +89,7 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 # Run the console
-console.run()
+console.run(iso_path="/Users/nathan/games/melee/SSMB.iso")
 
 # Connect to the console
 print("Connecting to console...")
@@ -104,7 +105,10 @@ print("Connecting controller to console...")
 if not controller.connect():
     print("ERROR: Failed to connect the controller.")
     sys.exit(-1)
-print("Controller connected")
+if not controller_opponent.connect():
+    print("ERROR: Failed to connect the controller.")
+    sys.exit(-1)
+print("Controllers connected")
 
 # Main loop
 while True:
@@ -120,30 +124,29 @@ while True:
 
     # What menu are we in?
     if gamestate.menu_state in [melee.Menu.IN_GAME, melee.Menu.SUDDEN_DEATH]:
+        print("in game")
 
         # Slippi Online matches assign you a random port once you're in game that's different
         #   than the one you're physically plugged into. This helper will autodiscover what
         #   port we actually are.
-        discovered_port = melee.gamestate.port_detector(gamestate, controller, melee.Character.FOX)
+        fox_port = melee.gamestate.port_detector(gamestate, controller, melee.Character.FOX)
+        falco_port = melee.gamestate.port_detector(gamestate, controller, melee.Character.FALCO)
 
-        if discovered_port > 0:
-            if args.framerecord:
-                framedata._record_frame(gamestate)
-            # NOTE: This is where your AI does all of its stuff!
-            # This line will get hit once per frame, so here is where you read
-            #   in the gamestate and decide what buttons to push on the controller
-            if args.framerecord:
-                melee.techskill.upsmashes(ai_state=gamestate.player[discovered_port], controller=controller)
-            else:
-                melee.techskill.multishine(ai_state=gamestate.player[discovered_port], controller=controller)
+        melee.techskill.upsmashes(ai_state=gamestate.player[falco_port], controller=controller)
+        melee.techskill.upsmashes(ai_state=gamestate.player[fox_port], controller=controller_opponent)
+
 
     else:
+        print("in menu")
         melee.MenuHelper.menu_helper_simple(gamestate,
-                                            controller,
-                                            args.port,
-                                            melee.Character.FOX,
-                                            melee.Stage.YOSHIS_STORY,
-                                            args.connect_code,
+                                            controller_1=controller,
+                                            controller_2=controller_opponent,
+                                            port_1=args.port,
+                                            port_2=args.opponent,
+                                            character_1_selected=melee.Character.FALCO,
+                                            character_2_selected=melee.Character.FOX,
+                                            stage_selected=melee.Stage.FINAL_DESTINATION,
+                                            connect_code=args.connect_code,
                                             autostart=True,
                                             swag=True)
     if log:

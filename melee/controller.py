@@ -62,7 +62,7 @@ class Controller:
     buttons programatically, but also automatically configuring the controller with dolphin
     """
 
-    def __init__(self, console, port, type=enums.ControllerType.STANDARD):
+    def __init__(self, console, port, type=enums.ControllerType.STANDARD, ai=True):
         """Create a new virtual controller
 
         Args:
@@ -176,6 +176,7 @@ class Controller:
             if not self.pipe:
                 return
             command = "PRESS " + str(button.value) + "\n"
+            print(command)
             if self.logger:
                 self.logger.log("Buttons Pressed", command, concat=True)
             self._write(command)
@@ -237,6 +238,7 @@ class Controller:
             if not self.pipe:
                 return
             command = "SET " + str(button.value) + " " + str(x) + " " + str(y) + "\n"
+            print(command)
             if self.logger:
                 self.logger.log("Buttons Pressed", command, concat=True)
             self._write(command)

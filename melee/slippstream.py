@@ -66,9 +66,11 @@ class SlippstreamClient():
             event_type = event.type
 
             if event.type == enet.EVENT_TYPE_NONE:
+                print("received none event")
                 if polling_mode:
                     return None
             if event.type == enet.EVENT_TYPE_RECEIVE:
+                print("received something")
                 try:
                     return json.loads(event.packet.data)
                 except json.JSONDecodeError:
@@ -78,12 +80,14 @@ class SlippstreamClient():
                         continue
                     return None
             elif event.type == enet.EVENT_TYPE_CONNECT:
+                print("received connect event")
                 handshake = json.dumps({
                     "type" : "connect_request",
                     "cursor" : 0,
                 })
                 self._peer.send(0, enet.Packet(handshake.encode()))
             elif event.type == enet.EVENT_TYPE_DISCONNECT:
+                print("received disconnnect event")
                 return None
         return None
 
@@ -94,4 +98,5 @@ class SlippstreamClient():
         """
         # Try to connect to the server and send a handshake
         self._peer = self._host.connect(enet.Address(bytes(self.address, 'utf-8'), int(self.port)), 1)
+        print(self._peer)
         return True

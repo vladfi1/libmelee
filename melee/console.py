@@ -93,10 +93,12 @@ class Console:
         self._temp_gamestate = None
         self._process = None
         if self.is_dolphin:
+            print("IS DOLPHIN")
             self._slippstream = SlippstreamClient(self.slippi_address, self.slippi_port)
             if self.path:
                 # Setup some dolphin config options
                 dolphin_config_path = self._get_dolphin_config_path() + "Dolphin.ini"
+                print("CONFIGT PATH", dolphin_config_path)
                 config = configparser.SafeConfigParser()
                 config.read(dolphin_config_path)
                 config.set("Core", 'slippienablespectator', "True")
@@ -274,12 +276,14 @@ class Console:
         frame_ended = False
         while not frame_ended:
             message = self._slippstream.dispatch(self._polling_mode)
+            print("message", message)
             if message:
                 if message["type"] == "connect_reply":
                     self.connected = True
                     self.nick = message["nick"]
                     self.version = message["version"]
                     self.cursor = message["cursor"]
+                    print("shoudl be returning")
 
                 elif message["type"] == "game_event":
                     if len(message["payload"]) > 0:
@@ -727,7 +731,7 @@ class Console:
     def _get_dolphin_home_path(self):
         """Return the path to dolphin's home directory"""
         if self.path:
-            return self.path + "/User/"
+            return os.path.join(self.path, os.pardir, "Resources", "User") + '/'
 
         home_path = str(Path.home())
         legacy_config_path = home_path + "/.dolphin-emu/"
@@ -756,7 +760,7 @@ class Console:
             # If this is an appimage install
             if platform.system() == "Linux" and os.path.isfile(self.path):
                 return str(Path.home()) + "/.config/SlippiOnline/Config/"
-            return self.path + "/User/Config/"
+            return os.path.join(self._get_dolphin_home_path(), 'Config') + '/'
         return ""
 
     def get_dolphin_pipes_path(self, port):
