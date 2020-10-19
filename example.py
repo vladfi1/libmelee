@@ -32,6 +32,8 @@ parser.add_argument('--dolphin_executable_path', '-e', default=None,
                     help='The directory where dolphin is')
 parser.add_argument('--connect_code', '-t', default="",
                     help='Direct connect code to connect to in Slippi Online')
+parser.add_argument('--iso', '-i', default="./SSMB.iso", help="Melee ISO file")
+
 
 args = parser.parse_args()
 
@@ -89,7 +91,7 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 # Run the console
-console.run(iso_path="/Users/nathan/games/melee/SSMB.iso")
+console.run(iso_path=args.iso)
 
 # Connect to the console
 print("Connecting to console...")
