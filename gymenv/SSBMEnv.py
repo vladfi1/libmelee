@@ -15,11 +15,36 @@ OP_PORT=1
 CONNECT_CODE=""
 
 # TODO: allow increasable bot difficulty
+# TODO: figure out size of action/obs space based on descretization
+"""
+BUTTON_A = "A"
+BUTTON_B = "B"
+BUTTON_X = "X"
+BUTTON_Y = "Y"
+BUTTON_Z = "Z"
+BUTTON_L = "L"
+BUTTON_R = "R"
+BUTTON_START = "START"
+BUTTON_D_UP = "D_UP"
+BUTTON_D_DOWN = "D_DOWN"
+BUTTON_D_LEFT = "D_LEFT"
+BUTTON_D_RIGHT = "D_RIGHT"
+#Control sticks considered "buttons" here
+BUTTON_MAIN = "MAIN"
+BUTTON_C = "C"
+Action space: [BUTTON_A, BUTTON_B, BUTTON_X, BUTTON_Y, BUTTON_Z, BUTTON_L, BUTTON_R, BUTTON_D_UP, BUTTON_D_DOWN, BUTTON_D_LEFT, BUTTON_D_RIGHT,
+                BUTTON_A_R, BUTTON_B_R, BUTTON_X_R, BUTTON_Y_R, BUTTON_Z_R, BUTTON_L_R, BUTTON_R_R, BUTTON_D_UP_R, BUTTON_D_DOWN_R, BUTTON_D_LEFT_R, BUTTON_D_RIGHT_R,
+                BUTTON_MAIN (0, 0), BUTTON_MAIN (0.5, 0), BUTTON_MAIN (0, 0.5), BUTTON_MAIN (1, 0), BUTTON_MAIN (0, 1), BUTTON_MAIN (1, 0.5), BUTTON_MAIN (0.5, 1), BUTTON_MAIN (1, 1),
+                BUTTON_C (0, 0), BUTTON_C (0.5, 0), BUTTON_C (0, 0.5), BUTTON_C (1, 0), BUTTON_C (0, 1), BUTTON_C (1, 0.5), BUTTON_C (0.5, 1), BUTTON_C (1, 1)]
+
+Observation space: [p1_x, p1_y, p1_percent, p1_shield, p1_facing, ]
+"""
+
 
 class SSBMEnv(gym.env):
     metadata = {'render.modes': ['human']}
 
-    def default_get_reward(prev_gamestate, gamestate): # define reward function
+    def _default_get_reward(prev_gamestate, gamestate): # define reward function
         return (gamestate.player[OP_PORT].percent-gamestate.player[PLAYER_PORT].percent, gamestate.player[PLAYER_PORT].percent-gamestate.player[OP_PORT].percent)
 
     """
@@ -97,12 +122,15 @@ class SSBMEnv(gym.env):
                                                 stage_selected=stage,
                                                 connect_code=CONNECT_CODE,
                                                 autostart=True,
-                                                swag=True)
+                                                swag=True) # TODO: input one last argument to say whether ctrlr_op will be cpu
             if self.log:
                 self.logger.logframe(self.gamestate)
                 self.logger.writeframe()
 
-        self.get_reward = default_get_reward if not reward_func else reward_func
+        self.get_reward = _default_get_reward if not reward_func else reward_func
+
+    def _get_state(self):
+
 
     def step(self, action): # step should advance our state (in the form of the obs space)
         prev_gamestate = self.gamestate
@@ -114,11 +142,11 @@ class SSBMEnv(gym.env):
         reward = self.get_reward(prev_gamestate, self.gamestate)
         # TODO: determine if game is over
 
-        return self.gamestate, reward, 
+        return self._get_state(), reward, 
 
     # return the new state, reward, done, and extra info
     def reset(self):    # should reset state to initial stats
-        
+
     
     def render(self, mode='human', close=False):    # should render current state on screen
         self.console.render = True
