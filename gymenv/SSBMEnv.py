@@ -2,6 +2,7 @@ import gym, melee, sys, signal
 from gym import error, spaces, utils
 from gym.utils import seeding
 import numpy as np 
+from melee import enums
 
 """
 Gym compatible env for libmelee (an RL framework for SSBM)
@@ -45,6 +46,11 @@ Observation space: [p1_char, p1_x, p1_y, p1_percent, p1_shield, p1_facing, p1_ac
 
 class SSBMEnv(gym.env):
     metadata = {'render.modes': ['human']}
+
+    buttons = [enums.Button.BUTTON_A, enums.Button.BUTTON_B, enums.Button.BUTTON_X, enums.Button.BUTTON_Y, enums.Button.BUTTON_Z, 
+               enums.Button.BUTTON_L, enums.Button.BUTTON_R, enums.Button.BUTTON_D_UP, enums.Button.BUTTON_D_DOWN, enums.Button.BUTTON_D_LEFT, 
+               enums.Button.BUTTON_D_RIGHT]
+    intervals = [(0, 0), (0.5, 0), (0, 0.5), (1, 0), (0, 1), (1, 0.5), (0.5, 1), (1, 1)]
 
     def _default_get_reward(prev_gamestate, gamestate): # define reward function
         return (gamestate.player[OP_PORT].percent-gamestate.player[PLAYER_PORT].percent, gamestate.player[PLAYER_PORT].percent-gamestate.player[OP_PORT].percent)
@@ -130,6 +136,9 @@ class SSBMEnv(gym.env):
                 self.logger.writeframe()
 
         self.get_reward = _default_get_reward if not reward_func else reward_func
+        self.observation_space = spaces.Box(-np.inf, np.inf, shape=(39,), dtype=np.float32)
+        self.num_actions = (len(buttons) + len(intervals))*2 # num actions *2 for press/release and both joysticks
+        self.action_space = spaces.Discrete(self.num_actions+1) # plus one for nop
 
     def _get_state(self):
         """
@@ -140,33 +149,52 @@ class SSBMEnv(gym.env):
         p1 = self.gamestate.player[PLAYER_PORT]
         p2 = self.gamestate.player[OP_PORT]
         p1_state = np.array([p1.character.value, p1.x, p1.y, p1.percent, p1.shield_strength, p1.facing, p1.action.value, p1.action_frame, 
-                             int(p1.invulnerable), p1.invulnerability_left, int(p1.hitlag), p1.hitstun_frames_left, p1.jumps_left, 
-                             int(p1.on_ground), p1.speed_air_x_self, p1.speed_y_self, p1.speed_x_attack, p1.speed_y_attack, p1.speed_ground_x_self, 
+                             float(p1.invulnerable), p1.invulnerability_left, float(p1.hitlag), p1.hitstun_frames_left, p1.jumps_left, 
+                             float(p1.on_ground), p1.speed_air_x_self, p1.speed_y_self, p1.speed_x_attack, p1.speed_y_attack, p1.speed_ground_x_self, 
                              self.gamestate.distance, p2.character.value, p2.x, p2.y, p2.percent, p2.shield_strength, p2.facing, p2.action.value, p2.action_frame, 
-                             int(p2.invulnerable), p2.invulnerability_left, int(p2.hitlag), p2.hitstun_frames_left, p2.jumps_left, 
-                             int(p2.on_ground), p2.speed_air_x_self, p2.speed_y_self, p2.speed_x_attack, p2.speed_y_attack, p2.speed_ground_x_self])
+                             float(p2.invulnerable), p2.invulnerability_left, float(p2.hitlag), p2.hitstun_frames_left, p2.jumps_left, 
+                             float(p2.on_ground), p2.speed_air_x_self, p2.speed_y_self, p2.speed_x_attack, p2.speed_y_attack, p2.speed_ground_x_self])
         p1, p2 = p2, p1 
         p2_state = np.array([p1.character.value, p1.x, p1.y, p1.percent, p1.shield_strength, p1.facing, p1.action.value, p1.action_frame, 
-                             int(p1.invulnerable), p1.invulnerability_left, int(p1.hitlag), p1.hitstun_frames_left, p1.jumps_left, 
-                             int(p1.on_ground), p1.speed_air_x_self, p1.speed_y_self, p1.speed_x_attack, p1.speed_y_attack, p1.speed_ground_x_self, 
+                             float(p1.invulnerable), p1.invulnerability_left, float(p1.hitlag), p1.hitstun_frames_left, p1.jumps_left, 
+                             float(p1.on_ground), p1.speed_air_x_self, p1.speed_y_self, p1.speed_x_attack, p1.speed_y_attack, p1.speed_ground_x_self, 
                              self.gamestate.distance, p2.character.value, p2.x, p2.y, p2.percent, p2.shield_strength, p2.facing, p2.action.value, p2.action_frame, 
-                             int(p2.invulnerable), p2.invulnerability_left, int(p2.hitlag), p2.hitstun_frames_left, p2.jumps_left, 
-                             int(p2.on_ground), p2.speed_air_x_self, p2.speed_y_self, p2.speed_x_attack, p2.speed_y_attack, p2.speed_ground_x_self])
+                             float(p2.invulnerable), p2.invulnerability_left, float(p2.hitlag), p2.hitstun_frames_left, p2.jumps_left, 
+                             float(p2.on_ground), p2.speed_air_x_self, p2.speed_y_self, p2.speed_x_attack, p2.speed_y_attack, p2.speed_ground_x_self])
         return p1_state, p2_state
+
+    def _perform_action(self, player, action_idx):
+        if action_idx == 0:
+            return
+        ctrlr = self.ctrlr if player == 0 else self.ctrlr_op
+        action_idx -= 1
+        len_b = len(buttons)
+        len_i = len(intervals)
+        if action_idx < len_b: # button press
+            ctrlr.press_button(buttons[action_idx])
+        elif action_idx < len_b*2: # button release
+            ctrlr.release_button(buttons[action_idx-len_b])
+        elif action_idx < len_b*2 + len_i: # main joystick tilt
+            tlt = intervals[action_idx-len_b*2]
+            ctrlr.tilt_analog(enums.BUTTON_MAIN, tlt[0], tlt[1])
+        else: # c joystick tilt
+            tlt = intervals[action_idx-(len_b*2+len_i)]
+            ctrlr.tilt_analog(enums.BUTTON_C, tlt[0], tlt[1])
 
 
     def step(self, action): # step should advance our state (in the form of the obs space)
         prev_gamestate = self.gamestate
-        # TODO: perform actions
-
+        # perform actions
+        self._perform_action(0, action["player"])
+        self._perform_action(1, action["player_op"])
         # step env
         self.gamestate = self.console.step()
         # collect reward
         reward = self.get_reward(prev_gamestate, self.gamestate)
         state = self._get_state()
-        # TODO: determine if game is over and write extra info
-        done = 
-        info = 
+        # determine if game is over and write extra info
+        done = self.gamestate.player[PLAYER_PORT].action.value <= 0xa or self.gamestate.player[OP_PORT].action.value <= 0xa
+        info = {} # TODO write frames skipped to info  (I think if we miss more than 6 frames between steps we might be in trouble)
         return (state[0], reward[0], done, info), (state[1], reward[1], done, info)
 
     def reset(self):    # should reset state to initial stats
