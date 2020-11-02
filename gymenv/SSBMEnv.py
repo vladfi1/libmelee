@@ -17,7 +17,8 @@ OP_PORT=1
 CONNECT_CODE=""
 
 # TODO: allow increasable bot difficulty
-# TODO: figure out size of action/obs space based on descretization
+# FIXME: getting error that gym has no env attr
+# FIXME: configparser.NoSectionError: No section: 'Core' how did we fix this earlier?
 """
 BUTTON_A = "A"
 BUTTON_B = "B"
@@ -79,7 +80,7 @@ class SSBMEnv(gym.env):
                        containing the reward for the player and opponent
     """
     def __init__(self, dolphin_exe_path, ssbm_iso_path, char1=melee.Character.FOX, char2=melee.Character.FALCO, 
-                stage=melee.Stage.FINAL_DESTINATION, symmetric=False, cpu_level=1, log=False, reward_func=None):
+                stage=melee.Stage.FINAL_DESTINATION, symmetric=False, cpu_level=1, log=False, reward_func=None, render=False):
         self.logger = melee.Logger()
         self.log = log
         self.console = melee.Console(path=dolphin_exe_path,
@@ -88,7 +89,7 @@ class SSBMEnv(gym.env):
                                     blocking_input=False,
                                     polling_mode=False,
                                     logger=self.logger)
-        self.console.render=False
+        self.console.render=render
         self.symmetric = symmetric
         self.ctrlr = melee.Controller(console=self.console,
                                     port=PLAYER_PORT,
@@ -197,9 +198,13 @@ class SSBMEnv(gym.env):
         info = {} # TODO write frames skipped to info  (I think if we miss more than 6 frames between steps we might be in trouble)
         return (state[0], reward[0], done, info), (state[1], reward[1], done, info)
 
-    def reset(self):    # should reset state to initial stats
+    #def reset(self):    # should reset state to initial stats
 
     
     def render(self, mode='human', close=False):    # should render current state on screen
         self.console.render = True
     
+
+if __name__ == "__main__":
+    ssbm_env = SSBMEnv("/Applications/Slippi\ Dolphin.app/Contents/MacOS", "/Users/nareg/Desktop/Launchpad/bRawl/SSMB.iso",
+                        symmetric=True, log=True, render=True)
