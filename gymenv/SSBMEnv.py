@@ -1,6 +1,7 @@
 import gym, melee, sys, signal
 from gym import error, spaces, utils
 from gym.utils import seeding
+import numpy as np 
 
 """
 Gym compatible env for libmelee (an RL framework for SSBM)
@@ -37,7 +38,8 @@ Action space: [BUTTON_A, BUTTON_B, BUTTON_X, BUTTON_Y, BUTTON_Z, BUTTON_L, BUTTO
                 BUTTON_MAIN (0, 0), BUTTON_MAIN (0.5, 0), BUTTON_MAIN (0, 0.5), BUTTON_MAIN (1, 0), BUTTON_MAIN (0, 1), BUTTON_MAIN (1, 0.5), BUTTON_MAIN (0.5, 1), BUTTON_MAIN (1, 1),
                 BUTTON_C (0, 0), BUTTON_C (0.5, 0), BUTTON_C (0, 0.5), BUTTON_C (1, 0), BUTTON_C (0, 1), BUTTON_C (1, 0.5), BUTTON_C (0.5, 1), BUTTON_C (1, 1)]
 
-Observation space: [p1_x, p1_y, p1_percent, p1_shield, p1_facing, ]
+Observation space: [p1_char, p1_x, p1_y, p1_percent, p1_shield, p1_facing, p1_action_enum_value, p1_action_frame, p1_invulnerable, p1_invulnerable_left, p1_hitlag, p1_hitstun_frames_left, p1_jumps_left, p1_on_ground, p1_speed_air_x_self,
+                    p1_speed_y_self, p1_speed_x_attack, p1_speed_y_attack, p1_speed_ground_x_self, distance_btw_players, ...p2 same attr...]
 """
 
 
@@ -68,7 +70,7 @@ class SSBMEnv(gym.env):
         - cpu_level: if symmetric=False this is the level of the cpu
         - log: are we logging stuff?
         - reward_func: custom reward function should take two gamestate objects as input and output a tuple
-                       containing the reward for the first agent and second agent
+                       containing the reward for the player and opponent
     """
     def __init__(self, dolphin_exe_path, ssbm_iso_path, char1=melee.Character.FOX, char2=melee.Character.FALCO, 
                 stage=melee.Stage.FINAL_DESTINATION, symmetric=False, cpu_level=1, log=False, reward_func=None):
@@ -130,6 +132,27 @@ class SSBMEnv(gym.env):
         self.get_reward = _default_get_reward if not reward_func else reward_func
 
     def _get_state(self):
+        """
+        [p1_char, p1_x, p1_y, p1_percent, p1_shield, p1_facing, p1_action_enum_value, p1_action_frame, p1_invulnerable, 
+         p1_invulnerable_left, p1_hitlag, p1_hitstun_frames_left, p1_jumps_left, p1_on_ground, p1_speed_air_x_self,
+         p1_speed_y_self, p1_speed_x_attack, p1_speed_y_attack, p1_speed_ground_x_self, distance_btw_players, ...p2 same attr...]
+        """
+        p1 = self.gamestate.player[PLAYER_PORT]
+        p2 = self.gamestate.player[OP_PORT]
+        p1_state = np.array([p1.character.value, p1.x, p1.y, p1.percent, p1.shield_strength, p1.facing, p1.action.value, p1.action_frame, 
+                             int(p1.invulnerable), p1.invulnerability_left, int(p1.hitlag), p1.hitstun_frames_left, p1.jumps_left, 
+                             int(p1.on_ground), p1.speed_air_x_self, p1.speed_y_self, p1.speed_x_attack, p1.speed_y_attack, p1.speed_ground_x_self, 
+                             self.gamestate.distance, p2.character.value, p2.x, p2.y, p2.percent, p2.shield_strength, p2.facing, p2.action.value, p2.action_frame, 
+                             int(p2.invulnerable), p2.invulnerability_left, int(p2.hitlag), p2.hitstun_frames_left, p2.jumps_left, 
+                             int(p2.on_ground), p2.speed_air_x_self, p2.speed_y_self, p2.speed_x_attack, p2.speed_y_attack, p2.speed_ground_x_self])
+        p1, p2 = p2, p1 
+        p2_state = np.array([p1.character.value, p1.x, p1.y, p1.percent, p1.shield_strength, p1.facing, p1.action.value, p1.action_frame, 
+                             int(p1.invulnerable), p1.invulnerability_left, int(p1.hitlag), p1.hitstun_frames_left, p1.jumps_left, 
+                             int(p1.on_ground), p1.speed_air_x_self, p1.speed_y_self, p1.speed_x_attack, p1.speed_y_attack, p1.speed_ground_x_self, 
+                             self.gamestate.distance, p2.character.value, p2.x, p2.y, p2.percent, p2.shield_strength, p2.facing, p2.action.value, p2.action_frame, 
+                             int(p2.invulnerable), p2.invulnerability_left, int(p2.hitlag), p2.hitstun_frames_left, p2.jumps_left, 
+                             int(p2.on_ground), p2.speed_air_x_self, p2.speed_y_self, p2.speed_x_attack, p2.speed_y_attack, p2.speed_ground_x_self])
+        return p1_state, p2_state
 
 
     def step(self, action): # step should advance our state (in the form of the obs space)
@@ -140,11 +163,12 @@ class SSBMEnv(gym.env):
         self.gamestate = self.console.step()
         # collect reward
         reward = self.get_reward(prev_gamestate, self.gamestate)
-        # TODO: determine if game is over
+        state = self._get_state()
+        # TODO: determine if game is over and write extra info
+        done = 
+        info = 
+        return (state[0], reward[0], done, info), (state[1], reward[1], done, info)
 
-        return self._get_state(), reward, 
-
-    # return the new state, reward, done, and extra info
     def reset(self):    # should reset state to initial stats
 
     
