@@ -44,18 +44,19 @@ Observation space: [p1_char, p1_x, p1_y, p1_percent, p1_shield, p1_facing, p1_ac
                     p1_speed_y_self, p1_speed_x_attack, p1_speed_y_attack, p1_speed_ground_x_self, distance_btw_players, ...p2 same attr...]
 """
 
-
-class SSBMEnv(gym.env):
-    metadata = {'render.modes': ['human']}
-
-    buttons = [enums.Button.BUTTON_A, enums.Button.BUTTON_B, enums.Button.BUTTON_X, enums.Button.BUTTON_Y, enums.Button.BUTTON_Z, 
+buttons = [enums.Button.BUTTON_A, enums.Button.BUTTON_B, enums.Button.BUTTON_X, enums.Button.BUTTON_Y, enums.Button.BUTTON_Z, 
                enums.Button.BUTTON_L, enums.Button.BUTTON_R, enums.Button.BUTTON_D_UP, enums.Button.BUTTON_D_DOWN, enums.Button.BUTTON_D_LEFT, 
                enums.Button.BUTTON_D_RIGHT]
-    intervals = [(0, 0), (0.5, 0), (0, 0.5), (1, 0), (0, 1), (1, 0.5), (0.5, 1), (1, 1)]
+intervals = [(0, 0), (0.5, 0), (0, 0.5), (1, 0), (0, 1), (1, 0.5), (0.5, 1), (1, 1)]
 
-    def _default_get_reward(prev_gamestate, gamestate): # define reward function
+def _default_get_reward(prev_gamestate, gamestate): # define reward function
         return (gamestate.player[OP_PORT].percent-gamestate.player[PLAYER_PORT].percent, gamestate.player[PLAYER_PORT].percent-gamestate.player[OP_PORT].percent)
 
+
+class SSBMEnv(gym.Env):
+    metadata = {'render.modes': ['human']}
+
+    
     """
     SSBMEnv Constructor
 
@@ -118,8 +119,10 @@ class SSBMEnv(gym.env):
         print("Controllers connected")
         # Step through main menu, player select, stage select scenes # TODO: include frame processing warning stuff?
         print("In menu")
-        self.gamestate = ""
-        while self.gamestate not in [melee.Menu.IN_GAME, melee.Menu.SUDDEN_DEATH]:
+        self.char1 = char1 
+        self.char2 = char2 
+        self.gamestate = self.console.step()
+        while self.gamestate.menu_state not in [melee.Menu.IN_GAME, melee.Menu.SUDDEN_DEATH]:
             self.gamestate = self.console.step()
             melee.MenuHelper.menu_helper_simple(self.gamestate,
                                                 controller_1=self.ctrlr,
@@ -131,7 +134,7 @@ class SSBMEnv(gym.env):
                                                 stage_selected=stage,
                                                 connect_code=CONNECT_CODE,
                                                 autostart=True,
-                                                swag=True) # TODO: input one last argument to say whether ctrlr_op will be cpu
+                                                swag=False) # TODO: input one last argument to say whether ctrlr_op will be cpu
             if self.log:
                 self.logger.logframe(self.gamestate)
                 self.logger.writeframe()
@@ -147,8 +150,8 @@ class SSBMEnv(gym.env):
          p1_invulnerable_left, p1_hitlag, p1_hitstun_frames_left, p1_jumps_left, p1_on_ground, p1_speed_air_x_self,
          p1_speed_y_self, p1_speed_x_attack, p1_speed_y_attack, p1_speed_ground_x_self, distance_btw_players, ...p2 same attr...]
         """
-        p1 = self.gamestate.player[PLAYER_PORT]
-        p2 = self.gamestate.player[OP_PORT]
+        p1 = self.gamestate.player[self.ctrlr_port]
+        p2 = self.gamestate.player[self.ctrlr_op_port]
         p1_state = np.array([p1.character.value, p1.x, p1.y, p1.percent, p1.shield_strength, p1.facing, p1.action.value, p1.action_frame, 
                              float(p1.invulnerable), p1.invulnerability_left, float(p1.hitlag), p1.hitstun_frames_left, p1.jumps_left, 
                              float(p1.on_ground), p1.speed_air_x_self, p1.speed_y_self, p1.speed_x_attack, p1.speed_y_attack, p1.speed_ground_x_self, 
@@ -177,13 +180,15 @@ class SSBMEnv(gym.env):
             ctrlr.release_button(buttons[action_idx-len_b])
         elif action_idx < len_b*2 + len_i: # main joystick tilt
             tlt = intervals[action_idx-len_b*2]
-            ctrlr.tilt_analog(enums.BUTTON_MAIN, tlt[0], tlt[1])
+            ctrlr.tilt_analog(enums.Button.BUTTON_MAIN, tlt[0], tlt[1])
         else: # c joystick tilt
             tlt = intervals[action_idx-(len_b*2+len_i)]
-            ctrlr.tilt_analog(enums.BUTTON_C, tlt[0], tlt[1])
+            ctrlr.tilt_analog(enums.Button.BUTTON_C, tlt[0], tlt[1])
 
 
     def step(self, action): # step should advance our state (in the form of the obs space)
+        self.ctrlr_port = melee.gamestate.port_detector(self.gamestate, self.ctrlr, self.char1) # TODO: Do we need to do this on every step?
+        self.ctrlr_op_port = melee.gamestate.port_detector(self.gamestate, self.ctrlr_op, self.char2)
         prev_gamestate = self.gamestate
         # perform actions
         self._perform_action(0, action["player"])
@@ -194,11 +199,11 @@ class SSBMEnv(gym.env):
         reward = self.get_reward(prev_gamestate, self.gamestate)
         state = self._get_state()
         # determine if game is over and write extra info
-        done = self.gamestate.player[PLAYER_PORT].action.value <= 0xa or self.gamestate.player[OP_PORT].action.value <= 0xa
+        done = self.gamestate.player[self.ctrlr_port].action.value <= 0xa or self.gamestate.player[self.ctrlr_op_port].action.value <= 0xa
         info = {} # TODO write frames skipped to info  (I think if we miss more than 6 frames between steps we might be in trouble)
         return (state[0], reward[0], done, info), (state[1], reward[1], done, info)
 
-    #def reset(self):    # should reset state to initial stats
+    #def reset(self):    # TODO: should reset state to initial state, how to do this?
 
     
     def render(self, mode='human', close=False):    # should render current state on screen
@@ -206,5 +211,10 @@ class SSBMEnv(gym.env):
     
 
 if __name__ == "__main__":
-    ssbm_env = SSBMEnv("/Applications/Slippi\ Dolphin.app/Contents/MacOS", "/Users/nareg/Desktop/Launchpad/bRawl/SSMB.iso",
+    ssbm_env = SSBMEnv("/Applications/Slippi Dolphin.app/Contents/MacOS", "/Users/nareg/Desktop/Launchpad/bRawl/SSMB.iso",
                         symmetric=True, log=True, render=True)
+
+    done = ssbm_env.step({"player": 0, "player_op": 0})[0][2]
+    while not done:
+        done = ssbm_env.step({"player": 36, "player_op": 0})[0][2]
+        ssbm_env.ctrlr.release_all()

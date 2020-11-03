@@ -1,3 +1,5 @@
+.vscode/
+
 #Log directory
 Logs/*
 MANIFEST
