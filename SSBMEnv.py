@@ -82,67 +82,13 @@ class SSBMEnv(gym.Env):
     """
     def __init__(self, dolphin_exe_path, ssbm_iso_path, char1=melee.Character.FOX, char2=melee.Character.FALCO, 
                 stage=melee.Stage.FINAL_DESTINATION, symmetric=False, cpu_level=1, log=False, reward_func=None, render=False):
+        self.init_args = locals().copy()
         self.logger = melee.Logger()
         self.log = log
-        self.console = melee.Console(path=dolphin_exe_path,
-                                    slippi_address=SLIPPI_ADDRESS,
-                                    slippi_port=SLIPPI_PORT,
-                                    blocking_input=False,
-                                    polling_mode=False,
-                                    logger=self.logger)
-        self.console.render=render
-        self.symmetric = symmetric
-        self.ctrlr = melee.Controller(console=self.console,
-                                    port=PLAYER_PORT,
-                                    type=melee.ControllerType.STANDARD)
-        if symmetric:
-            self.ctrlr_op = melee.Controller(console=self.console,
-                                       port=OP_PORT,
-                                       type=melee.ControllerType.STANDARD)
+        self.console = None
         #else:
             # TODO: make self.ctrlr_op a computer controlled opponent
         # TODO: implement sigint stuff
-
-        self.console.run(iso_path=ssbm_iso_path)
-        print("Connecting to console...")
-        if not self.console.connect():
-            print("ERROR: Failed to connect to the console.")
-            sys.exit(-1)
-        # Plug our controller in
-        print("Connecting controller to console...")
-        if not self.ctrlr.connect():
-            print("ERROR: Failed to connect the controller.")
-            sys.exit(-1)
-        if not self.ctrlr_op.connect():
-            print("ERROR: Failed to connect the controller.")
-            sys.exit(-1)
-        print("Controllers connected")
-        # Step through main menu, player select, stage select scenes # TODO: include frame processing warning stuff?
-        print("In menu")
-        self.char1 = char1 
-        self.char2 = char2 
-        self.gamestate = self.console.step()
-        while self.gamestate.menu_state not in [melee.Menu.IN_GAME, melee.Menu.SUDDEN_DEATH]:
-            self.gamestate = self.console.step()
-            melee.MenuHelper.menu_helper_simple(self.gamestate,
-                                                controller_1=self.ctrlr,
-                                                controller_2=self.ctrlr_op,
-                                                port_1=PLAYER_PORT,
-                                                port_2=OP_PORT,
-                                                character_1_selected=char1,
-                                                character_2_selected=char2,
-                                                stage_selected=stage,
-                                                connect_code=CONNECT_CODE,
-                                                autostart=True,
-                                                swag=False) # TODO: input one last argument to say whether ctrlr_op will be cpu
-            if self.log:
-                self.logger.logframe(self.gamestate)
-                self.logger.writeframe()
-
-        self.get_reward = _default_get_reward if not reward_func else reward_func
-        self.observation_space = spaces.Box(-np.inf, np.inf, shape=(39,), dtype=np.float32)
-        self.num_actions = (len(buttons) + len(intervals))*2 # num actions *2 for press/release and both joysticks
-        self.action_space = spaces.Discrete(self.num_actions+1) # plus one for nop
 
     def _get_state(self):
         """
@@ -203,18 +149,85 @@ class SSBMEnv(gym.Env):
         info = {} # TODO write frames skipped to info  (I think if we miss more than 6 frames between steps we might be in trouble)
         return (state[0], reward[0], done, info), (state[1], reward[1], done, info)
 
-    #def reset(self):    # TODO: should reset state to initial state, how to do this?
+    def reset(self):    # TODO: should reset state to initial state, how to do this?
+        if self.console is not None:
+            self.console.stop()
+            time.sleep(5)
+        self.console = melee.Console(path=self.init_args["dolphin_exe_path"],
+                                    slippi_address=SLIPPI_ADDRESS,
+                                    slippi_port=SLIPPI_PORT,
+                                    blocking_input=False,
+                                    polling_mode=False,
+                                    logger=self.logger)
+        self.console.render=self.init_args["render"]
+        self.symmetric = self.init_args["symmetric"]
+        self.ctrlr = melee.Controller(console=self.console,
+                                    port=PLAYER_PORT,
+                                    type=melee.ControllerType.STANDARD)
+        if self.symmetric:
+            self.ctrlr_op = melee.Controller(console=self.console,
+                                       port=OP_PORT,
+                                       type=melee.ControllerType.STANDARD)
+        self.console.run(iso_path=self.init_args["ssbm_iso_path"])
+        print("Connecting to console...")
+        if not self.console.connect():
+            print("ERROR: Failed to connect to the console.")
+            sys.exit(-1)
+        # Plug our controller in
+        print("Connecting controller to console...")
+        if not self.ctrlr.connect():
+            print("ERROR: Failed to connect the controller.")
+            sys.exit(-1)
+        if not self.ctrlr_op.connect():
+            print("ERROR: Failed to connect the controller.")
+            sys.exit(-1)
+        print("Controllers connected")
+        # Step through main menu, player select, stage select scenes # TODO: include frame processing warning stuff?
+        print("In menu")
+        self.char1 = self.init_args["char1"] 
+        self.char2 = self.init_args["char2"] 
+        self.gamestate = self.console.step()
+        while self.gamestate.menu_state not in [melee.Menu.IN_GAME, melee.Menu.SUDDEN_DEATH]:
+            self.gamestate = self.console.step()
+            melee.MenuHelper.menu_helper_simple(self.gamestate,
+                                                controller_1=self.ctrlr,
+                                                controller_2=self.ctrlr_op,
+                                                port_1=PLAYER_PORT,
+                                                port_2=OP_PORT,
+                                                character_1_selected=self.char1,
+                                                character_2_selected=self.char2,
+                                                stage_selected=self.init_args["stage"],
+                                                connect_code=CONNECT_CODE,
+                                                autostart=True,
+                                                swag=False) # TODO: input one last argument to say whether ctrlr_op will be cpu
+            if self.log:
+                self.logger.logframe(self.gamestate)
+                self.logger.writeframe()
+
+        self.get_reward = _default_get_reward if not self.init_args["reward_func"] else self.init_args["reward_func"]
+        self.observation_space = spaces.Box(-np.inf, np.inf, shape=(39,), dtype=np.float32)
+        self.num_actions = (len(buttons) + len(intervals))*2 # num actions *2 for press/release and both joysticks
+        self.action_space = spaces.Discrete(self.num_actions+1) # plus one for nop
 
     
     def render(self, mode='human', close=False):    # should render current state on screen
         self.console.render = True
     
+import time
 
 if __name__ == "__main__":
-    ssbm_env = SSBMEnv("/Applications/Slippi Dolphin.app/Contents/MacOS", "/Users/nareg/Desktop/Launchpad/bRawl/SSMB.iso",
+    ssbm_env = SSBMEnv("./dolphin-emu.app/Contents/MacOS", "m.iso",
                         symmetric=True, log=True, render=True)
+    ssbm_env.reset()
 
     done = ssbm_env.step({"player": 0, "player_op": 0})[0][2]
+    start_time = time.time()
     while not done:
-        done = ssbm_env.step({"player": 36, "player_op": 0})[0][2]
+        curr_time = time.time() - start_time
+        print(">>>>>", curr_time)
+        if curr_time > 18:
+            start_time = time.time()
+            ssbm_env.reset()
+        done = ssbm_env.step({"player": 35, "player_op": 0})[0][2]
+        done = ssbm_env.step({"player": 31, "player_op": 0})[0][2]
         ssbm_env.ctrlr.release_all()
