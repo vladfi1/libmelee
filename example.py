@@ -3,6 +3,7 @@ import argparse
 import signal
 import sys
 import melee
+import time
 
 # This example program demonstrates how to use the Melee API to run a console,
 #   setup controllers, and send button presses over to a console (dolphin or Slippi/Wii)
@@ -89,7 +90,7 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 # Run the console
-console.run(iso_path="/Users/nathan/games/melee/SSMB.iso")
+console.run(iso_path="/Users/nareg/Desktop/Launchpad/bRawl/SSMB.iso")
 
 # Connect to the console
 print("Connecting to console...")
@@ -125,12 +126,11 @@ while True:
     # What menu are we in?
     if gamestate.menu_state in [melee.Menu.IN_GAME, melee.Menu.SUDDEN_DEATH]:
         print("in game")
-
         # Slippi Online matches assign you a random port once you're in game that's different
         #   than the one you're physically plugged into. This helper will autodiscover what
         #   port we actually are.
         fox_port = melee.gamestate.port_detector(gamestate, controller, melee.Character.FOX)
-        falco_port = melee.gamestate.port_detector(gamestate, controller, melee.Character.FALCO)
+        falco_port = melee.gamestate.port_detector(gamestate, controller, melee.Character.CPTFALCON)
 
         melee.techskill.upsmashes(ai_state=gamestate.player[falco_port], controller=controller)
         melee.techskill.upsmashes(ai_state=gamestate.player[fox_port], controller=controller_opponent)
@@ -143,7 +143,7 @@ while True:
                                             controller_2=controller_opponent,
                                             port_1=args.port,
                                             port_2=args.opponent,
-                                            character_1_selected=melee.Character.FALCO,
+                                            character_1_selected=melee.Character.CPTFALCON,
                                             character_2_selected=melee.Character.FOX,
                                             stage_selected=melee.Stage.FINAL_DESTINATION,
                                             connect_code=args.connect_code,

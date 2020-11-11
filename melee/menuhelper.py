@@ -9,6 +9,7 @@ import math
 class MenuHelper():
     name_tag_index = 0
     inputs_live = False
+    cpu_level = -1
 
     def menu_helper_simple(gamestate,
                             controller_1,
@@ -20,7 +21,9 @@ class MenuHelper():
                             stage_selected,
                             connect_code,
                             autostart=False,
-                            swag=True):
+                            swag=True,
+                            make_cpu=False,
+                            level=1):
         """Siplified menu helper function to get you through the menus and into a game
 
         Does everything for you but play the game. Gets you to the right menu screen, picks
@@ -51,13 +54,17 @@ class MenuHelper():
                                             port=port_1,
                                             controller=controller_1,
                                             swag=True,
-                                            start=autostart)
+                                            start=autostart,
+                                            make_cpu=make_cpu,
+                                            level=level)
                 MenuHelper.choose_character(character=character_2_selected,
                                             gamestate=gamestate,
                                             port=port_2,
                                             controller=controller_2,
                                             swag=True,
-                                            start=autostart)
+                                            start=autostart,
+                                            make_cpu=False,
+                                            level=level)
         # If we're at the postgame scores screen, spam START
         elif gamestate.menu_state == enums.Menu.POSTGAME_SCORES:
             MenuHelper.skip_postgame(controller=controller_1)
@@ -141,7 +148,7 @@ class MenuHelper():
 
         return index
 
-    def choose_character(character, gamestate, port, controller, swag=False, start=False):
+    def choose_character(character, gamestate, port, controller, swag=False, start=False, make_cpu=False, level=1):
         """Choose a character from the character select menu
 
         Args:
@@ -184,8 +191,8 @@ class MenuHelper():
             isSlippiCSS = True
             character_selected = gamestate.player[1].character_selected
 
-        row = character.value // 9
-        column = character.value % 9
+        row = character.value // 9 # enums.Character.PIKACHU.value // 9 -> 1
+        column = character.value % 9 # enums.Character.PIKACHU.value % 9 -> 3
         #The random slot pushes the bottom row over a slot, so compensate for that
         if row == 2:
             column = column+1
@@ -198,10 +205,10 @@ class MenuHelper():
             column = 0
 
         #Height starts at 1, plus half a box height, plus the number of rows
-        target_y = 1 + 3.5 + (row * 7.0)
+        target_y = 1 + 3.5 + (row * 7.0) # -> 1 + 3.5 + (1*7) = 11.5
         #Starts at -32.5, plus half a box width, plus the number of columns
         #NOTE: Technically, each column isn't exactly the same width, but it's close enough
-        target_x = -32.5 + 3.5 + (column * 7.0)
+        target_x = -32.5 + 3.5 + (column * 7.0) # -> -32.5 + 3.5 + (3*7) = -8
         #Wiggle room in positioning character
         wiggleroom = 1.5
 
@@ -258,13 +265,65 @@ class MenuHelper():
         print("five")
 
         #If character is selected, and we're in of the area, and coin is down, then we're good
-        if (character_selected == character) and coin_down:
-            if start and gamestate.ready_to_start and controller.prev.button[enums.Button.BUTTON_START] == False:
-                controller.press_button(enums.Button.BUTTON_START)
-                return
+        if character_selected == character and coin_down:
+            if make_cpu and MenuHelper.cpu_level == -1:   # if we are making this a cpu select cpu option
+                print(cursor_x, cursor_y)
+                t_x, t_y = -10.0, 2.0
+                room = 1.0
+                # If hand isn't over toggle, move it there
+                if cursor_x > t_x + room or cursor_x < t_x - room or cursor_y > t_y + room or cursor_y < t_y - room:
+                    #Move up if we're too low
+                    if cursor_y < t_y - room:
+                        print("move up here")
+                        controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, 1)
+                    #Move down if we're too high
+                    elif cursor_y > t_y + room:
+                        print("move down here")
+                        controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, 0)
+                    #Move right if we're too left
+                    elif cursor_x < t_x - room:
+                        print("move left here")
+                        controller.tilt_analog(enums.Button.BUTTON_MAIN, 1, .5)
+                    #Move left if we're too right
+                    elif cursor_x > t_x + room:
+                        print("move right here")
+                        controller.tilt_analog(enums.Button.BUTTON_MAIN, 0, .5)
+                    return
+                # else press/release a to select cpu
+                else:
+                    print(make_cpu)
+                    while True:
+                        a = 1
+                    controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, .5)
+                    controller.press_button(enums.Button.BUTTON_A)
+                    controller.release_button(enums.Button.BUTTON_A)
+                    MenuHelper.cpu_level = 1
+                    return
+
+            elif make_cpu and MenuHelper.cpu_level != level: # increment cpu level if we aren't at desired level
+                # if we are not over level up arrow move towards that upper arrow
+                t_x, t_y = 0, 0
+                room = 0.5
+                if 1:
+                    print("")
+                    return
+                # else keep pressing a until we reach desired level
+                else:
+                    # first set main joystick to neutral
+                    controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, .5)
+                    while MenuHelper.cpu_level != level:
+                        # press and release A to increment level
+                        controller.press_button(enums.Button.BUTTON_A)
+                        controller.release_button(enums.Button.BUTTON_A)
+                        MenuHelper.cpu_level += 1
+                    return
             else:
-                controller.release_all()
-                return
+                if start and gamestate.ready_to_start and controller.prev.button[enums.Button.BUTTON_START] == False:
+                    controller.press_button(enums.Button.BUTTON_START)
+                    return
+                else:
+                    controller.release_all()
+                    return
 
         print("six")
 

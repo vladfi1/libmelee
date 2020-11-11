@@ -1,4 +1,4 @@
-import gym, melee, sys, signal
+import gym, melee, sys, signal, time
 from gym import error, spaces, utils
 from gym.utils import seeding
 import numpy as np 
@@ -134,7 +134,8 @@ class SSBMEnv(gym.Env):
                                                 stage_selected=stage,
                                                 connect_code=CONNECT_CODE,
                                                 autostart=True,
-                                                swag=False) # TODO: input one last argument to say whether ctrlr_op will be cpu
+                                                swag=False,
+                                                make_cpu=True) # TODO: input one last argument to say whether ctrlr_op will be cpu
             if self.log:
                 self.logger.logframe(self.gamestate)
                 self.logger.writeframe()
@@ -206,7 +207,7 @@ class SSBMEnv(gym.Env):
     #def reset(self):    # TODO: should reset state to initial state, how to do this?
 
     
-    def render(self, mode='human', close=False):    # should render current state on screen
+    def render(self, mode='human', close=False):    # FIXME: changing this parameter does nothing rn??
         self.console.render = True
     
 
@@ -216,5 +217,5 @@ if __name__ == "__main__":
 
     done = ssbm_env.step({"player": 0, "player_op": 0})[0][2]
     while not done:
-        done = ssbm_env.step({"player": 36, "player_op": 0})[0][2]
-        ssbm_env.ctrlr.release_all()
+        done = ssbm_env.step({"player": 35, "player_op": 0})[0][2]
+        done = ssbm_env.step({"player": 31, "player_op": 0})[0][2]

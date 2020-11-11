@@ -276,7 +276,7 @@ class Console:
         frame_ended = False
         while not frame_ended:
             message = self._slippstream.dispatch(self._polling_mode)
-            print("message", message)
+            #print("message", message)
             if message:
                 if message["type"] == "connect_reply":
                     self.connected = True

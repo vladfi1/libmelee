@@ -70,7 +70,7 @@ class SlippstreamClient():
                 if polling_mode:
                     return None
             if event.type == enet.EVENT_TYPE_RECEIVE:
-                print("received something")
+                #print("received something")
                 try:
                     return json.loads(event.packet.data)
                 except json.JSONDecodeError:
