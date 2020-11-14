@@ -93,12 +93,10 @@ class Console:
         self._temp_gamestate = None
         self._process = None
         if self.is_dolphin:
-            print("IS DOLPHIN")
             self._slippstream = SlippstreamClient(self.slippi_address, self.slippi_port)
             if self.path:
                 # Setup some dolphin config options
                 dolphin_config_path = self._get_dolphin_config_path() + "Dolphin.ini"
-                print("CONFIGT PATH", dolphin_config_path)
                 config = configparser.SafeConfigParser()
                 config.read(dolphin_config_path)
                 config.set("Core", 'slippienablespectator', "True")
@@ -276,14 +274,12 @@ class Console:
         frame_ended = False
         while not frame_ended:
             message = self._slippstream.dispatch(self._polling_mode)
-            #print("message", message)
             if message:
                 if message["type"] == "connect_reply":
                     self.connected = True
                     self.nick = message["nick"]
                     self.version = message["version"]
                     self.cursor = message["cursor"]
-                    print("shoudl be returning")
 
                 elif message["type"] == "game_event":
                     if len(message["payload"]) > 0:

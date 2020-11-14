@@ -33,7 +33,7 @@ class CommType(Enum):
 class SlippstreamClient():
     """ Container representing a client to some SlippiComm server """
 
-    def __init__(self, address="127.0.0.1", port=51441, realtime=True):
+    def __init__(self, address="127.0.0.1", port=51441, realtime=True, verbose=False):
         """ Constructor for this object """
         self._host = enet.Host(None, 1, 0, 0)
         self._peer = None
@@ -41,6 +41,7 @@ class SlippstreamClient():
         self.realtime = realtime
         self.address = address
         self.port = port
+        self.verbose = verbose
 
     def shutdown(self):
         """ Close down the socket and connection to the console """
@@ -66,11 +67,11 @@ class SlippstreamClient():
             event_type = event.type
 
             if event.type == enet.EVENT_TYPE_NONE:
-                print("received none event")
+                if self.verbose:
+                    print("received None event")
                 if polling_mode:
                     return None
             if event.type == enet.EVENT_TYPE_RECEIVE:
-                #print("received something")
                 try:
                     return json.loads(event.packet.data)
                 except json.JSONDecodeError:
@@ -80,14 +81,16 @@ class SlippstreamClient():
                         continue
                     return None
             elif event.type == enet.EVENT_TYPE_CONNECT:
-                print("received connect event")
+                if self.verbose:
+                    print("received connect event")
                 handshake = json.dumps({
                     "type" : "connect_request",
                     "cursor" : 0,
                 })
                 self._peer.send(0, enet.Packet(handshake.encode()))
             elif event.type == enet.EVENT_TYPE_DISCONNECT:
-                print("received disconnnect event")
+                if self.verbose:
+                    print("received disconnect event")
                 return None
         return None
 
@@ -98,5 +101,4 @@ class SlippstreamClient():
         """
         # Try to connect to the server and send a handshake
         self._peer = self._host.connect(enet.Address(bytes(self.address, 'utf-8'), int(self.port)), 1)
-        print(self._peer)
         return True

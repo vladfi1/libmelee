@@ -5,17 +5,18 @@ concentrate on playing the game, not futzing with menus.
 """
 from melee import enums
 import math
+import time
 
 class MenuHelper():
     name_tag_index = 0
     inputs_live = False
     cpu_level = -1
+    cpu_toggled = False
+    cpu_level_toggled = False
 
     def menu_helper_simple(gamestate,
                             controller_1,
                             controller_2,
-                            port_1,
-                            port_2,
                             character_1_selected,
                             character_2_selected,
                             stage_selected,
@@ -23,7 +24,8 @@ class MenuHelper():
                             autostart=False,
                             swag=True,
                             make_cpu=False,
-                            level=1):
+                            level=1,
+                            verbose=False):
         """Siplified menu helper function to get you through the menus and into a game
 
         Does everything for you but play the game. Gets you to the right menu screen, picks
@@ -31,14 +33,21 @@ class MenuHelper():
 
         Args:
             gamestate (gamestate.GameState): The current GameState for this frame
-            controller (controller.Controller): A Controller object that the bot will press buttons on
-            character_selected (enums.Character): The character your bot will play as
+            controller_1 (controller.Controller): A Controller object that the bot will press buttons on
+            controller_2 (controller.Controller): A Controller object that the bot will press buttons on
+            character_1_selected (enums.Character): The character that controller_1 will play as
+            character_2_selected (enums.Character): The character that controller_2 will play as
             stage_selected (enums.Stage): The stage your bot will choose to play on
             connect_code (str): The connect code to direct match with. Leave blank for VS mode.
             autostart (bool): Automatically start the game when it's ready.
                 Useful for BotvBot matches where no human is there to start it.
             swag (bool): What it sounds like
+            make_cpu (bool): Whether player on port 2 should be CPU or not
+            level (int): Level of CPU to set. Only valid if make_cpu
+            verbose (bool): Whether to log important intermediate info
         """
+        if level not in range(1, 10):
+            raise ValueError("CPU level must be in [1, 9] but {} was specified".format(level))
 
         # If we're at the character select screen, choose our character
         if gamestate.menu_state in [enums.Menu.CHARACTER_SELECT, enums.Menu.SLIPPI_ONLINE_CSS]:
@@ -48,23 +57,30 @@ class MenuHelper():
                                                            connect_code=connect_code,
                                                            index=MenuHelper.name_tag_index)
             else:
-                print("choosing character")
+                if verbose:
+                    print("Player {} selecting character {}".format(port_1, character_1_selected))
                 MenuHelper.choose_character(character=character_1_selected,
                                             gamestate=gamestate,
-                                            port=port_1,
                                             controller=controller_1,
-                                            swag=True,
-                                            start=autostart,
-                                            make_cpu=make_cpu,
-                                            level=level)
+                                            rand=True,
+                                            swag=swag,
+                                            start=False,
+                                            make_cpu=False,
+                                            level=level, 
+                                            verbose=verbose)
+
+                if verbose:
+                    print("Player {} selecting character {}".format(port_2, character_2_selected))
                 MenuHelper.choose_character(character=character_2_selected,
                                             gamestate=gamestate,
-                                            port=port_2,
                                             controller=controller_2,
-                                            swag=True,
+                                            rand=True,
+                                            swag=False,
                                             start=autostart,
-                                            make_cpu=False,
-                                            level=level)
+                                            make_cpu=make_cpu,
+                                            level=level,
+                                            verbose=verbose)
+
         # If we're at the postgame scores screen, spam START
         elif gamestate.menu_state == enums.Menu.POSTGAME_SCORES:
             MenuHelper.skip_postgame(controller=controller_1)
@@ -148,15 +164,17 @@ class MenuHelper():
 
         return index
 
-    def choose_character(character, gamestate, port, controller, swag=False, start=False, make_cpu=False, level=1):
+    def choose_character(character, gamestate, controller, rand=True, swag=False, start=False, make_cpu=False, level=1, verbose=False):
         """Choose a character from the character select menu
 
         Args:
             character (enums.Character): The character you want to pick
             gamestate (gamestate.GameState): The current gamestate
             controller (controller.Controller): The controller object to press buttons on
-            swag (bool): Pick random until you get the character
+            rand (bool): Pick random until you get the character (makes this robust to pertubations in the character layout screen)
             start (bool): Automatically start the match when it's ready
+            make_cpu (bool): Whether this selected character should be a CPU
+            level (int): The level of CPU to set. Only valid if make_cpu
 
         Note:
             Intended to be called each frame while in the character select menu
@@ -168,7 +186,10 @@ class MenuHelper():
         # Figure out where the character is on the select screen
         # NOTE: This assumes you have all characters unlocked
         # Positions will be totally wrong if something is not unlocked
+        port = controller.port
         if port not in gamestate.player:
+            if verbose:
+                print("port {} not currently in use".format(port))
             controller.release_all()
             return
 
@@ -200,7 +221,7 @@ class MenuHelper():
         row = 2-row
 
         #Go to the random character
-        if swag:
+        if rand:
             row = 0
             column = 0
 
@@ -212,10 +233,43 @@ class MenuHelper():
         #Wiggle room in positioning character
         wiggleroom = 1.5
 
-        print("one")
+        #We want to get to a state where the cursor is NOT over the character,
+        # but it's selected. Thus ensuring the token is on the character
+        isOverCharacter = abs(cursor_x - target_x) < wiggleroom and \
+            abs(cursor_y - target_y) < wiggleroom
 
-        # We are already set, so let's taunt our opponent
-        if character_selected == character and swag and not start:
+        cpu_done = not make_cpu or MenuHelper.cpu_level == level
+        character_done = character_selected == character
+        done = cpu_done and character_done
+
+        if verbose:
+            print("Status:\n")
+            print("Cursor Pos:\t", (cursor_x, cursor_y))
+            print("Target Pos:\t", (target_x, target_y))
+            print("isOverCharacter:\t", isOverCharacter)
+            print("character:\t", character)
+            print("character_selected:\t", character_selected)
+            print("character_done:\t", character_done)
+            print("cpu toggled?\t", MenuHelper.cpu_toggled)
+            print("cpu slider toggled?\t", MenuHelper.cpu_level_toggled)
+            print("cpu level:\t", MenuHelper.cpu_level)
+            print("cpu_done:\t", cpu_done)
+            print("done:\t", done)
+            print("start:\t", start)
+            print("isSlippiCSS:\t", isSlippiCSS)
+
+        # Always start on slippi online games if ready
+        if done and isSlippiCSS:
+            if verbose:
+                print("done in slippi online")
+            controller.press_button(enums.Button.BUTTON_START)
+            return
+
+
+        # We are already set and don't want to start, so let's taunt our opponent
+        if done and swag and not start:
+            if verbose:
+                print("done and swagging")
             delta_x = 3 * math.cos(gamestate.frame / 1.5)
             delta_y = 3 * math.sin(gamestate.frame / 1.5)
 
@@ -242,97 +296,144 @@ class MenuHelper():
             controller.tilt_analog(enums.Button.BUTTON_MAIN, x, y)
             return
 
-        print("two")
-
-        if character_selected == character and swag and isSlippiCSS:
-            controller.press_button(enums.Button.BUTTON_START)
+        # We are already set and don't want to start or taunt
+        if done and not start:
+            if verbose:
+                print("done and waiting")
             return
 
-        print("three")
-
-        #We want to get to a state where the cursor is NOT over the character,
-        # but it's selected. Thus ensuring the token is on the character
-        isOverCharacter = abs(cursor_x - target_x) < wiggleroom and \
-            abs(cursor_y - target_y) < wiggleroom
-
-        print("four")
 
         #Don't hold down on B, since we'll quit the menu if we do
         if controller.prev.button[enums.Button.BUTTON_B] == True:
             controller.release_button(enums.Button.BUTTON_B)
             return
 
-        print("five")
+        # Character is selected and CPU doesn't need to be changed
+        if done:
+            if verbose:
+                print("done")
+            # Start if we can and should
+            if start and gamestate.ready_to_start and controller.prev.button[enums.Button.BUTTON_START] == False:
+                if verbose:
+                    print("starting")
+                controller.press_button(enums.Button.BUTTON_START)
+                return
+            # No futher action necessary
+            else:
+                controller.release_all()
+                return
 
-        #If character is selected, and we're in of the area, and coin is down, then we're good
-        if character_selected == character and coin_down:
-            if make_cpu and MenuHelper.cpu_level == -1:   # if we are making this a cpu select cpu option
-                print(cursor_x, cursor_y)
-                t_x, t_y = -10.0, 2.0
+        # Need to adjuct CPU settings
+        if character_done and not cpu_done:
+            if verbose:
+                print("Working on CPU")
+            # Need to toggle controller input to be a CPU
+            if not MenuHelper.cpu_toggled:
+                if verbose:
+                    print("Making cpu")
+                t_x, t_y = -45 + 15 * port, -2.5
                 room = 1.0
                 # If hand isn't over toggle, move it there
                 if cursor_x > t_x + room or cursor_x < t_x - room or cursor_y > t_y + room or cursor_y < t_y - room:
+                    controller.release_button(enums.Button.BUTTON_A)
                     #Move up if we're too low
                     if cursor_y < t_y - room:
-                        print("move up here")
                         controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, 1)
                     #Move down if we're too high
                     elif cursor_y > t_y + room:
-                        print("move down here")
                         controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, 0)
                     #Move right if we're too left
                     elif cursor_x < t_x - room:
-                        print("move left here")
                         controller.tilt_analog(enums.Button.BUTTON_MAIN, 1, .5)
                     #Move left if we're too right
                     elif cursor_x > t_x + room:
-                        print("move right here")
                         controller.tilt_analog(enums.Button.BUTTON_MAIN, 0, .5)
                     return
-                # else press/release a to select cpu
+                # else press/release A to select cpu
                 else:
-                    print(make_cpu)
-                    while True:
-                        a = 1
+                    if verbose:
+                        print("over cpu toggle")
+                    controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, .5)
+
+                    # Press and release must happen on two different frames to be properly read by dolphin
+                    if controller.prev.button[enums.Button.BUTTON_A] == False:
+                        # Pressing
+                        controller.press_button(enums.Button.BUTTON_A)
+                        return
+                    else:
+                        # Pressed on previous frame so release now
+                        controller.release_button(enums.Button.BUTTON_A)
+                        MenuHelper.cpu_toggled = True
+                        return
+
+            # CPU is toggled but level slider is not selected 
+            elif make_cpu and not MenuHelper.cpu_level_toggled:
+                if verbose:
+                    print('finding cpu level slider')
+                t_x, t_y = -45 + 15 * port, -14.5
+                room = 0.5
+                # If hand isn't over toggle, move it there
+                if cursor_x > t_x + room or cursor_x < t_x - room or cursor_y > t_y + room or cursor_y < t_y - room:
+                    controller.release_button(enums.Button.BUTTON_A)
+                    #Move up if we're too low
+                    if cursor_y < t_y - room:
+                        controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, 1)
+                    #Move down if we're too high
+                    elif cursor_y > t_y + room:
+                        controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, 0)
+                    #Move right if we're too left
+                    elif cursor_x < t_x - room:
+                        controller.tilt_analog(enums.Button.BUTTON_MAIN, 1, .5)
+                    #Move left if we're too right
+                    elif cursor_x > t_x + room:
+                        controller.tilt_analog(enums.Button.BUTTON_MAIN, 0, .5)
+                    return
+                # Select slider by pressing A
+                else:
+                    if verbose:
+                        print("found cpu toggle")
                     controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, .5)
                     controller.press_button(enums.Button.BUTTON_A)
+                    MenuHelper.cpu_level_toggled = True
+                    return
+            
+            # Slidder is selected but level needs to be changed
+            elif make_cpu and MenuHelper.cpu_level_toggled and MenuHelper.cpu_level != level:
+                if verbose:
+                    print('sliding cpu level toggle')
+                # Only horizontal position matters for horizonal slider
+                t_x = -46.75 + 15 * port + 1.23 * level
+
+                # Small tolerance because level is very sensitive to slider position
+                room = 0.1
+
+                # If hand isn't over correct cpu level on slider so move it there
+                if cursor_x > t_x + room or cursor_x < t_x - room: 
                     controller.release_button(enums.Button.BUTTON_A)
-                    MenuHelper.cpu_level = 1
+                    #Move right if we're too left
+                    if cursor_x < t_x - room:
+                        controller.tilt_analog(enums.Button.BUTTON_MAIN, 0.7, .5) # Note the finer movements
+                    #Move left if we're too right
+                    elif cursor_x > t_x + room:
+                        controller.tilt_analog(enums.Button.BUTTON_MAIN, 0.3, .5) # Note the finer movements
                     return
-
-            elif make_cpu and MenuHelper.cpu_level != level: # increment cpu level if we aren't at desired level
-                # if we are not over level up arrow move towards that upper arrow
-                t_x, t_y = 0, 0
-                room = 0.5
-                if 1:
-                    print("")
-                    return
-                # else keep pressing a until we reach desired level
+                # Release CPU level slider as it's in correct position
                 else:
-                    # first set main joystick to neutral
+                    if verbose:
+                        print("releasing cpu level slider")
                     controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, .5)
-                    while MenuHelper.cpu_level != level:
-                        # press and release A to increment level
-                        controller.press_button(enums.Button.BUTTON_A)
-                        controller.release_button(enums.Button.BUTTON_A)
-                        MenuHelper.cpu_level += 1
+                    controller.press_button(enums.Button.BUTTON_A)
+                    MenuHelper.cpu_level = level
                     return
-            else:
-                if start and gamestate.ready_to_start and controller.prev.button[enums.Button.BUTTON_START] == False:
-                    controller.press_button(enums.Button.BUTTON_START)
-                    return
-                else:
-                    controller.release_all()
-                    return
-
-        print("six")
+                
 
         #release start in addition to anything else
         controller.release_button(enums.Button.BUTTON_START)
 
         #If we're in the right area, select the character
         if isOverCharacter:
-            print("seven")
+            if verbose:
+                print("cursor over character")
             #If we're over the character, but it isn't selected,
             #   then the coin must be somewhere else.
             #   Press B to reclaim the coin
@@ -340,7 +441,7 @@ class MenuHelper():
             controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, .5)
 
             # The slippi menu doesn't have a coin down. We can make-do
-            if isSlippiCSS and (character_selected != character):
+            if isSlippiCSS and not character_done:
                 if gamestate.frame % 5 == 0:
                     controller.press_button(enums.Button.BUTTON_B)
                     controller.release_button(enums.Button.BUTTON_A)
@@ -350,7 +451,7 @@ class MenuHelper():
                     controller.release_button(enums.Button.BUTTON_B)
                     return
 
-            if (character_selected != character) and coin_down:
+            if not character_done and coin_down:
                 controller.press_button(enums.Button.BUTTON_B)
                 controller.release_button(enums.Button.BUTTON_A)
                 return
@@ -363,27 +464,24 @@ class MenuHelper():
                     controller.release_button(enums.Button.BUTTON_A)
                     return
         else:
-            print("eight")
+            if verbose:
+                print("moving cursor towards character")
             #Move in
             controller.release_button(enums.Button.BUTTON_A)
             #Move up if we're too low
             if cursor_y < target_y - wiggleroom:
-                print("move up")
                 controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, 1)
                 return
             #Move down if we're too high
             if cursor_y > target_y + wiggleroom:
-                print("move down")
                 controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, 0)
                 return
             #Move right if we're too left
             if cursor_x < target_x - wiggleroom:
-                print("move left")
                 controller.tilt_analog(enums.Button.BUTTON_MAIN, 1, .5)
                 return
             #Move left if we're too right
             if cursor_x > target_x + wiggleroom:
-                print("move right")
                 controller.tilt_analog(enums.Button.BUTTON_MAIN, 0, .5)
                 return
         controller.release_all()
@@ -569,3 +667,13 @@ class MenuHelper():
             controller.press_button(enums.Button.BUTTON_START)
         else:
             controller.release_all()
+
+    def print_location(gamestate, controller):
+        if port not in gamestate.player:
+            return
+
+        my_state = gamestate.player[controller.port]
+
+        cursor_x, cursor_y = my_state.cursor_x, my_state.cursor_y
+
+        print("My location ({}, {})".format(cursor_x, cursor_y))

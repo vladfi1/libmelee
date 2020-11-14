@@ -32,8 +32,9 @@ def multishine(ai_state, controller):
 
     controller.release_all()
 
-def upsmashes(ai_state, controller):
+def upsmashes(gamestate, controller):
     """ Spam upsmashes """
+    ai_state = gamestate.player[controller.port]
     if ai_state.action == enums.Action.STANDING:
         controller.tilt_analog(enums.Button.BUTTON_C, .5, 1)
         return

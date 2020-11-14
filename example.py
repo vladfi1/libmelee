@@ -18,10 +18,10 @@ def check_port(value):
 parser = argparse.ArgumentParser(description='Example of libmelee in action')
 parser.add_argument('--port', '-p', type=check_port,
                     help='The controller port (1-4) your AI will play on',
-                    default=2)
+                    default=1)
 parser.add_argument('--opponent', '-o', type=check_port,
                     help='The controller port (1-4) the opponent will play on',
-                    default=1)
+                    default=2)
 parser.add_argument('--debug', '-d', action='store_true',
                     help='Debug mode. Creates a CSV of all game states')
 parser.add_argument('--framerecord', '-r', default=False, action='store_true',
@@ -33,6 +33,14 @@ parser.add_argument('--dolphin_executable_path', '-e', default=None,
                     help='The directory where dolphin is')
 parser.add_argument('--connect_code', '-t', default="",
                     help='Direct connect code to connect to in Slippi Online')
+parser.add_argument('--iso_path', '-g', default="~/SSMB.iso",
+                    help='Full path to Melee ISO file')
+parser.add_argument('--cpu', '-c', action='store_true',
+                    help='Whether to set oponent as CPU')
+parser.add_argument('--cpu_level', '-l', type=int, default=3,
+                    help='Level of CPU. Only valid if cpu is true')
+parser.add_argument('--verbose', action='store_true',
+                    help='Whether to print info to stdout')
 
 args = parser.parse_args()
 
@@ -68,12 +76,14 @@ console.render = True
 #   virtual or physical.
 controller = melee.Controller(console=console,
                               port=args.port,
-                              type=melee.ControllerType.STANDARD)
+                              type=melee.ControllerType.STANDARD,
+                              verbose=args.verbose)
 
 controller_opponent = melee.Controller(console=console,
                                        port=args.opponent,
                                        type=melee.ControllerType.STANDARD,
-                                       ai=True)
+                                       ai=True,
+                                       verbose=args.verbose)
 
 # This isn't necessary, but makes it so that Dolphin will get killed when you ^C
 def signal_handler(sig, frame):
@@ -90,7 +100,7 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 # Run the console
-console.run(iso_path="/Users/nareg/Desktop/Launchpad/bRawl/SSMB.iso")
+console.run(iso_path=args.iso_path)
 
 # Connect to the console
 print("Connecting to console...")
@@ -123,32 +133,28 @@ while True:
     if console.processingtime * 1000 > 12:
         print("WARNING: Last frame took " + str(console.processingtime*1000) + "ms to process.")
 
-    # What menu are we in?
+    # If in game
     if gamestate.menu_state in [melee.Menu.IN_GAME, melee.Menu.SUDDEN_DEATH]:
-        print("in game")
-        # Slippi Online matches assign you a random port once you're in game that's different
-        #   than the one you're physically plugged into. This helper will autodiscover what
-        #   port we actually are.
-        fox_port = melee.gamestate.port_detector(gamestate, controller, melee.Character.FOX)
-        falco_port = melee.gamestate.port_detector(gamestate, controller, melee.Character.CPTFALCON)
+        # Have both player spam upsmashes
+        melee.techskill.upsmashes(gamestate=gamestate, controller=controller)
 
-        melee.techskill.upsmashes(ai_state=gamestate.player[falco_port], controller=controller)
-        melee.techskill.upsmashes(ai_state=gamestate.player[fox_port], controller=controller_opponent)
+        if not args.cpu:
+            melee.techskill.upsmashes(gamestate=gamestate, controller=controller_opponent)
 
-
+    # If in menu
     else:
-        print("in menu")
         melee.MenuHelper.menu_helper_simple(gamestate,
                                             controller_1=controller,
                                             controller_2=controller_opponent,
-                                            port_1=args.port,
-                                            port_2=args.opponent,
                                             character_1_selected=melee.Character.CPTFALCON,
                                             character_2_selected=melee.Character.FOX,
                                             stage_selected=melee.Stage.FINAL_DESTINATION,
                                             connect_code=args.connect_code,
                                             autostart=True,
-                                            swag=True)
+                                            swag=True,
+                                            make_cpu=args.cpu,
+                                            level=args.cpu_level,
+                                            verbose=args.verbose)
     if log:
         log.logframe(gamestate)
         log.writeframe()

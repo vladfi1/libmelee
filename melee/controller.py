@@ -62,19 +62,23 @@ class Controller:
     buttons programatically, but also automatically configuring the controller with dolphin
     """
 
-    def __init__(self, console, port, type=enums.ControllerType.STANDARD, ai=True):
+    def __init__(self, console, port, type=enums.ControllerType.STANDARD, ai=True, verbose=False):
         """Create a new virtual controller
 
         Args:
             console (console.Console): A console object to attach the controller to
             port (int): Which controller port to plug into. Must be 1-4.
             type (enums.ControllerType): The type of controller this is
+            ai (bool): Whether this controller will be used by ai or human
+            verbose (bool): Whether all commands that controller executes should be printed
         """
         self._is_dolphin = console.is_dolphin
         if self._is_dolphin:
             self.pipe_path = console.get_dolphin_pipes_path(port)
             self.pipe = None
 
+        self.port = port
+        self.verbose = verbose
         self.prev = ControllerState()
         self.current = ControllerState()
         self.logger = console.logger
@@ -176,7 +180,6 @@ class Controller:
             if not self.pipe:
                 return
             command = "PRESS " + str(button.value) + "\n"
-            print(command)
             if self.logger:
                 self.logger.log("Buttons Pressed", command, concat=True)
             self._write(command)
@@ -238,7 +241,6 @@ class Controller:
             if not self.pipe:
                 return
             command = "SET " + str(button.value) + " " + str(x) + " " + str(y) + "\n"
-            print(command)
             if self.logger:
                 self.logger.log("Buttons Pressed", command, concat=True)
             self._write(command)
@@ -320,6 +322,8 @@ class Controller:
     def _write(self, command):
         """ Platform independent button write function.
         """
+        if self.verbose:
+            print("Controller {} is writing command {}".format(self.port, command))
         if platform.system() == "Windows":
             try:
                 win32file.WriteFile(self.pipe, command.encode())
@@ -334,6 +338,8 @@ class Controller:
         Up until this point, any buttons you 'press' are just queued in a pipe.
         It doesn't get sent to the console until you flush
         """
+        if self.verbose:
+            print("Contoller {} is flushing".format(port))
         # Move the current controller state into the previous one
         self.prev = copy.copy(self.current)
 
