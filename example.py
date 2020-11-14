@@ -121,6 +121,18 @@ if not controller_opponent.connect():
     sys.exit(-1)
 print("Controllers connected")
 
+menu_helper = melee.MenuHelper(controller_1=controller,
+                                controller_2=controller_opponent,
+                                character_1_selected=melee.Character.CPTFALCON,
+                                character_2_selected=melee.Character.FOX,
+                                stage_selected=melee.Stage.FINAL_DESTINATION,
+                                connect_code=args.connect_code,
+                                autostart=True,
+                                swag=True,
+                                make_cpu=args.cpu,
+                                level=args.cpu_level,
+                                verbose=args.verbose)
+
 # Main loop
 while True:
     # "step" to the next frame
@@ -143,18 +155,8 @@ while True:
 
     # If in menu
     else:
-        melee.MenuHelper.menu_helper_simple(gamestate,
-                                            controller_1=controller,
-                                            controller_2=controller_opponent,
-                                            character_1_selected=melee.Character.CPTFALCON,
-                                            character_2_selected=melee.Character.FOX,
-                                            stage_selected=melee.Stage.FINAL_DESTINATION,
-                                            connect_code=args.connect_code,
-                                            autostart=True,
-                                            swag=True,
-                                            make_cpu=args.cpu,
-                                            level=args.cpu_level,
-                                            verbose=args.verbose)
+        menu_helper.step(gamestate)
+                                            
     if log:
         log.logframe(gamestate)
         log.writeframe()

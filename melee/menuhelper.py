@@ -8,24 +8,18 @@ import math
 import time
 
 class MenuHelper():
-    name_tag_index = 0
-    inputs_live = False
-    cpu_level = -1
-    cpu_toggled = False
-    cpu_level_toggled = False
 
-    def menu_helper_simple(gamestate,
-                            controller_1,
-                            controller_2,
-                            character_1_selected,
-                            character_2_selected,
-                            stage_selected,
-                            connect_code,
-                            autostart=False,
-                            swag=True,
-                            make_cpu=False,
-                            level=1,
-                            verbose=False):
+    def __init__(self, controller_1,
+                        controller_2,
+                        character_1_selected,
+                        character_2_selected,
+                        stage_selected,
+                        connect_code,
+                        autostart=False,
+                        swag=True,
+                        make_cpu=False,
+                        level=1,
+                        verbose=False):
         """Siplified menu helper function to get you through the menus and into a game
 
         Does everything for you but play the game. Gets you to the right menu screen, picks
@@ -46,56 +40,77 @@ class MenuHelper():
             level (int): Level of CPU to set. Only valid if make_cpu
             verbose (bool): Whether to log important intermediate info
         """
-        if level not in range(1, 10):
+        self.controller_1 = controller_1
+        self.controller_2 = controller_2
+        self.character_1_selected = character_1_selected
+        self.character_2_selected = character_2_selected
+        self.stage_selected = stage_selected
+        self.connect_code = connect_code
+        self.autostart = autostart
+        self.swag = swag
+        self.make_cpu = make_cpu
+        self.level = level
+        self.verbose = verbose
+        self.name_tag_index = 0
+        self.inputs_live = False
+        self.cpu_level = -1
+        self.cpu_toggled = False
+        self.cpu_level_toggled = False
+
+    def step(self, gamestate):
+        """
+        Makes all the necessary controller button presses to advance the menu to the desired final state
+        given the current frame
+
+        Args:
+            gamestate (gamestate.GameState): The current gamestate
+        """
+        if self.level not in range(1, 10):
             raise ValueError("CPU level must be in [1, 9] but {} was specified".format(level))
 
         # If we're at the character select screen, choose our character
         if gamestate.menu_state in [enums.Menu.CHARACTER_SELECT, enums.Menu.SLIPPI_ONLINE_CSS]:
             if gamestate.submenu == enums.SubMenu.NAME_ENTRY_SUBMENU:
-                MenuHelper.name_tag_index = MenuHelper.enter_direct_code(gamestate=gamestate,
+                self.name_tag_index = self.enter_direct_code(gamestate=gamestate,
                                                            controller=controller_1,
                                                            connect_code=connect_code,
-                                                           index=MenuHelper.name_tag_index)
+                                                           index=self.name_tag_index)
             else:
-                if verbose:
+                if self.verbose:
                     print("Player {} selecting character {}".format(port_1, character_1_selected))
-                MenuHelper.choose_character(character=character_1_selected,
+                self.choose_character(character=self.character_1_selected,
                                             gamestate=gamestate,
-                                            controller=controller_1,
+                                            controller=self.controller_1,
                                             rand=True,
-                                            swag=swag,
+                                            swag=self.swag,
                                             start=False,
                                             make_cpu=False,
-                                            level=level, 
-                                            verbose=verbose)
+                                            level=self.level)
 
-                if verbose:
+                if self.verbose:
                     print("Player {} selecting character {}".format(port_2, character_2_selected))
-                MenuHelper.choose_character(character=character_2_selected,
+                self.choose_character(character=self.character_2_selected,
                                             gamestate=gamestate,
-                                            controller=controller_2,
+                                            controller=self.controller_2,
                                             rand=True,
                                             swag=False,
-                                            start=autostart,
-                                            make_cpu=make_cpu,
-                                            level=level,
-                                            verbose=verbose)
+                                            start=self.autostart,
+                                            make_cpu=self.make_cpu,
+                                            level=self.level)
 
         # If we're at the postgame scores screen, spam START
         elif gamestate.menu_state == enums.Menu.POSTGAME_SCORES:
-            MenuHelper.skip_postgame(controller=controller_1)
+            self.skip_postgame(controller=self.controller_1)
         # If we're at the stage select screen, choose a stage
         elif gamestate.menu_state == enums.Menu.STAGE_SELECT:
-            MenuHelper.choose_stage(stage=stage_selected,
-                                    gamestate=gamestate,
-                                    controller=controller_1)
+            self.choose_stage(gamestate, self.controller_1)
         elif gamestate.menu_state == enums.Menu.MAIN_MENU:
-            if connect_code:
-                MenuHelper.choose_direct_online(gamestate=gamestate, controller=controller_1)
+            if self.connect_code:
+                self.choose_direct_online(gamestate=gamestate, controller=self.controller_1)
             else:
-                MenuHelper.choose_versus_mode(gamestate=gamestate, controller=controller_1)
+                self.choose_versus_mode(gamestate=gamestate, controller=self.controller_1)
 
-    def enter_direct_code(gamestate, controller, connect_code, index):
+    def enter_direct_code(self, gamestate, controller, connect_code, index):
         """At the nametag entry screen, enter the given direct connect code and exit
 
         Args:
@@ -111,9 +126,9 @@ class MenuHelper():
         #   So if the first character is A, then the input can get eaten
         #   Account for this by making sure we can move off the letter first
         if gamestate.menu_selection != 45:
-            MenuHelper.inputs_live = True
+            self.inputs_live = True
 
-        if not MenuHelper.inputs_live:
+        if not self.inputs_live:
             controller.tilt_analog(enums.Button.BUTTON_MAIN, 1, .5)
             return index
 
@@ -164,7 +179,7 @@ class MenuHelper():
 
         return index
 
-    def choose_character(character, gamestate, controller, rand=True, swag=False, start=False, make_cpu=False, level=1, verbose=False):
+    def choose_character(self, character, gamestate, controller, rand=True, swag=False, start=False, make_cpu=False, level=1):
         """Choose a character from the character select menu
 
         Args:
@@ -188,7 +203,7 @@ class MenuHelper():
         # Positions will be totally wrong if something is not unlocked
         port = controller.port
         if port not in gamestate.player:
-            if verbose:
+            if self.verbose:
                 print("port {} not currently in use".format(port))
             controller.release_all()
             return
@@ -238,11 +253,11 @@ class MenuHelper():
         isOverCharacter = abs(cursor_x - target_x) < wiggleroom and \
             abs(cursor_y - target_y) < wiggleroom
 
-        cpu_done = not make_cpu or MenuHelper.cpu_level == level
+        cpu_done = not make_cpu or self.cpu_level == level
         character_done = character_selected == character
         done = cpu_done and character_done
 
-        if verbose:
+        if self.verbose:
             print("Status:\n")
             print("Cursor Pos:\t", (cursor_x, cursor_y))
             print("Target Pos:\t", (target_x, target_y))
@@ -250,9 +265,9 @@ class MenuHelper():
             print("character:\t", character)
             print("character_selected:\t", character_selected)
             print("character_done:\t", character_done)
-            print("cpu toggled?\t", MenuHelper.cpu_toggled)
-            print("cpu slider toggled?\t", MenuHelper.cpu_level_toggled)
-            print("cpu level:\t", MenuHelper.cpu_level)
+            print("cpu toggled?\t", self.cpu_toggled)
+            print("cpu slider toggled?\t", self.cpu_level_toggled)
+            print("cpu level:\t", self.cpu_level)
             print("cpu_done:\t", cpu_done)
             print("done:\t", done)
             print("start:\t", start)
@@ -260,7 +275,7 @@ class MenuHelper():
 
         # Always start on slippi online games if ready
         if done and isSlippiCSS:
-            if verbose:
+            if self.verbose:
                 print("done in slippi online")
             controller.press_button(enums.Button.BUTTON_START)
             return
@@ -268,7 +283,7 @@ class MenuHelper():
 
         # We are already set and don't want to start, so let's taunt our opponent
         if done and swag and not start:
-            if verbose:
+            if self.verbose:
                 print("done and swagging")
             delta_x = 3 * math.cos(gamestate.frame / 1.5)
             delta_y = 3 * math.sin(gamestate.frame / 1.5)
@@ -298,7 +313,7 @@ class MenuHelper():
 
         # We are already set and don't want to start or taunt
         if done and not start:
-            if verbose:
+            if self.verbose:
                 print("done and waiting")
             return
 
@@ -310,11 +325,11 @@ class MenuHelper():
 
         # Character is selected and CPU doesn't need to be changed
         if done:
-            if verbose:
+            if self.verbose:
                 print("done")
             # Start if we can and should
             if start and gamestate.ready_to_start and controller.prev.button[enums.Button.BUTTON_START] == False:
-                if verbose:
+                if self.verbose:
                     print("starting")
                 controller.press_button(enums.Button.BUTTON_START)
                 return
@@ -325,11 +340,11 @@ class MenuHelper():
 
         # Need to adjuct CPU settings
         if character_done and not cpu_done:
-            if verbose:
+            if self.verbose:
                 print("Working on CPU")
             # Need to toggle controller input to be a CPU
-            if not MenuHelper.cpu_toggled:
-                if verbose:
+            if not self.cpu_toggled:
+                if self.verbose:
                     print("Making cpu")
                 t_x, t_y = -45 + 15 * port, -2.5
                 room = 1.0
@@ -351,7 +366,7 @@ class MenuHelper():
                     return
                 # else press/release A to select cpu
                 else:
-                    if verbose:
+                    if self.verbose:
                         print("over cpu toggle")
                     controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, .5)
 
@@ -363,12 +378,12 @@ class MenuHelper():
                     else:
                         # Pressed on previous frame so release now
                         controller.release_button(enums.Button.BUTTON_A)
-                        MenuHelper.cpu_toggled = True
+                        self.cpu_toggled = True
                         return
 
             # CPU is toggled but level slider is not selected 
-            elif make_cpu and not MenuHelper.cpu_level_toggled:
-                if verbose:
+            elif make_cpu and not self.cpu_level_toggled:
+                if self.verbose:
                     print('finding cpu level slider')
                 t_x, t_y = -45 + 15 * port, -14.5
                 room = 0.5
@@ -390,16 +405,16 @@ class MenuHelper():
                     return
                 # Select slider by pressing A
                 else:
-                    if verbose:
+                    if self.verbose:
                         print("found cpu toggle")
                     controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, .5)
                     controller.press_button(enums.Button.BUTTON_A)
-                    MenuHelper.cpu_level_toggled = True
+                    self.cpu_level_toggled = True
                     return
             
             # Slidder is selected but level needs to be changed
-            elif make_cpu and MenuHelper.cpu_level_toggled and MenuHelper.cpu_level != level:
-                if verbose:
+            elif make_cpu and self.cpu_level_toggled and self.cpu_level != level:
+                if self.verbose:
                     print('sliding cpu level toggle')
                 # Only horizontal position matters for horizonal slider
                 t_x = -46.75 + 15 * port + 1.23 * level
@@ -419,11 +434,11 @@ class MenuHelper():
                     return
                 # Release CPU level slider as it's in correct position
                 else:
-                    if verbose:
+                    if self.verbose:
                         print("releasing cpu level slider")
                     controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, .5)
                     controller.press_button(enums.Button.BUTTON_A)
-                    MenuHelper.cpu_level = level
+                    self.cpu_level = level
                     return
                 
 
@@ -432,7 +447,7 @@ class MenuHelper():
 
         #If we're in the right area, select the character
         if isOverCharacter:
-            if verbose:
+            if self.verbose:
                 print("cursor over character")
             #If we're over the character, but it isn't selected,
             #   then the coin must be somewhere else.
@@ -464,7 +479,7 @@ class MenuHelper():
                     controller.release_button(enums.Button.BUTTON_A)
                     return
         else:
-            if verbose:
+            if self.verbose:
                 print("moving cursor towards character")
             #Move in
             controller.release_button(enums.Button.BUTTON_A)
@@ -486,13 +501,12 @@ class MenuHelper():
                 return
         controller.release_all()
 
-    def choose_stage(stage, gamestate, controller):
+    def choose_stage(self, gamestate, controller):
         """Choose a stage from the stage select menu
 
         Intended to be called each frame while in the stage select menu
 
         Args:
-            stage (enums.Stage): The stage you want to select
             gamestate (gamestate.GameState): The current gamestate
             controller (controller.Controller): The controller object to press
         """
@@ -500,19 +514,19 @@ class MenuHelper():
             controller.release_all()
             return
         target_x, target_y = 0, 0
-        if stage == enums.Stage.BATTLEFIELD:
+        if self.stage_selected == enums.Stage.BATTLEFIELD:
             target_x, target_y = 1, -9
-        if stage == enums.Stage.FINAL_DESTINATION:
+        if self.stage_selected == enums.Stage.FINAL_DESTINATION:
             target_x, target_y = 6.7, -9
-        if stage == enums.Stage.DREAMLAND:
+        if self.stage_selected == enums.Stage.DREAMLAND:
             target_x, target_y = 12.5, -9
-        if stage == enums.Stage.POKEMON_STADIUM:
+        if self.stage_selected == enums.Stage.POKEMON_STADIUM:
             target_x, target_y = 15, 3.5
-        if stage == enums.Stage.YOSHIS_STORY:
+        if self.stage_selected == enums.Stage.YOSHIS_STORY:
             target_x, target_y = 3.5, 15.5
-        if stage == enums.Stage.FOUNTAIN_OF_DREAMS:
+        if self.stage_selected == enums.Stage.FOUNTAIN_OF_DREAMS:
             target_x, target_y = 10, 15.5
-        if stage == enums.Stage.RANDOM_STAGE:
+        if self.stage_selected == enums.Stage.RANDOM_STAGE:
             target_x, target_y = -13.5, 3.5
 
         #Wiggle room in positioning cursor
@@ -541,7 +555,7 @@ class MenuHelper():
         #If we get in the right area, press A
         controller.press_button(enums.Button.BUTTON_A)
 
-    def skip_postgame(controller):
+    def skip_postgame(self, controller):
         """ Spam the start button """
         #Alternate pressing start and letting go
         if controller.prev.button[enums.Button.BUTTON_START] == False:
@@ -549,7 +563,7 @@ class MenuHelper():
         else:
             controller.release_button(enums.Button.BUTTON_START)
 
-    def change_controller_status(controller, gamestate, targetport, port, status, character=None):
+    def change_controller_status(self, controller, gamestate, targetport, port, status, character=None):
         """Switch a given player's controller to be of the given state
 
         Note:
@@ -602,7 +616,7 @@ class MenuHelper():
         else:
             controller.release_button(enums.Button.BUTTON_A)
 
-    def choose_versus_mode(gamestate, controller):
+    def choose_versus_mode(self, gamestate, controller):
         """Helper function to bring us into the versus mode menu
 
         Args:
@@ -632,7 +646,7 @@ class MenuHelper():
         else:
             controller.release_all()
 
-    def choose_direct_online(gamestate, controller):
+    def choose_direct_online(self, gamestate, controller):
         """Helper function to bring us into the direct connect online menu
 
         Args:
@@ -668,7 +682,7 @@ class MenuHelper():
         else:
             controller.release_all()
 
-    def print_location(gamestate, controller):
+    def print_location(self, gamestate, controller):
         if port not in gamestate.player:
             return
 
