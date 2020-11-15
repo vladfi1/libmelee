@@ -213,6 +213,10 @@ class SSBMEnv(gym.Env):
         self._is_dolphin_running = False
     
     def step(self, action): # step should advance our state (in the form of the obs space)
+        # why do we need to do this?
+        self.ctrlr_port = melee.gamestate.port_detector(self.gamestate, self.ctrlr, self.char1) 
+        self.ctrlr_op_port = melee.gamestate.port_detector(self.gamestate, self.ctrlr_op, self.char2)
+        
         prev_gamestate = self.gamestate
         # perform actions
         self._perform_action(0, action["player"])
