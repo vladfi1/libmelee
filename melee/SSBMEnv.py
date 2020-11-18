@@ -12,8 +12,8 @@ Attr:
 """
 SLIPPI_ADDRESS = "127.0.0.1"
 SLIPPI_PORT=51441
-PLAYER_PORT=2
-OP_PORT=1
+PLAYER_PORT=1
+OP_PORT=2
 CONNECT_CODE=""
 
 # TODO: allow increasable bot difficulty
@@ -48,9 +48,6 @@ buttons = [enums.Button.BUTTON_A, enums.Button.BUTTON_B, enums.Button.BUTTON_X, 
                enums.Button.BUTTON_L, enums.Button.BUTTON_R, enums.Button.BUTTON_D_UP, enums.Button.BUTTON_D_DOWN, enums.Button.BUTTON_D_LEFT, 
                enums.Button.BUTTON_D_RIGHT]
 intervals = [(0, 0), (0.5, 0), (0, 0.5), (1, 0), (0, 1), (1, 0.5), (0.5, 1), (1, 1)]
-
-def _default_get_reward(prev_gamestate, gamestate): # define reward function
-        return (gamestate.player[OP_PORT].percent-gamestate.player[PLAYER_PORT].percent, gamestate.player[PLAYER_PORT].percent-gamestate.player[OP_PORT].percent)
 
 
 class SSBMEnv(gym.Env):
@@ -97,10 +94,22 @@ class SSBMEnv(gym.Env):
         self.console = None
         self._is_dolphin_running = False
 
-        self.get_reward = _default_get_reward if not self.reward_func else self.reward_func
+        self.get_reward = self._default_get_reward if not self.reward_func else self.reward_func
         self.observation_space = spaces.Box(-np.inf, np.inf, shape=(39,), dtype=np.float32)
         self.num_actions = (len(buttons) + len(intervals))*2 # num actions *2 for press/release and both joysticks
         self.action_space = spaces.Discrete(self.num_actions+1) # plus one for nop
+
+    def _default_get_reward(self, prev_gamestate, gamestate): # define reward function
+        # TODO: make sure that the correct damage goes to the correct player
+        p1_reward = gamestate.player[self.ctrlr_op_port].percent-gamestate.player[self.ctrlr_port].percent
+        p2_reward = gamestate.player[self.ctrlr_port].percent-gamestate.player[self.ctrlr_op_port].percent
+        rewards = [p1_reward, p2_reward]
+
+        joint_reward = {}
+        for i, agent in enumerate(self.agents):
+            joint_reward[agent] = rewards[i]
+        
+        return joint_reward
 
 
     def _get_state(self):
@@ -109,6 +118,8 @@ class SSBMEnv(gym.Env):
          p1_invulnerable_left, p1_hitlag, p1_hitstun_frames_left, p1_jumps_left, p1_on_ground, p1_speed_air_x_self,
          p1_speed_y_self, p1_speed_x_attack, p1_speed_y_attack, p1_speed_ground_x_self, distance_btw_players, ...p2 same attr...]
         """
+        # TODO: make sure the correct state goes to the correct player
+        # I make the assumption that p1 is *always* a non-cpu and p2 is the cpu, if present
         p1 = self.gamestate.player[self.ctrlr_port]
         p2 = self.gamestate.player[self.ctrlr_op_port]
         p1_state = np.array([p1.character.value, p1.x, p1.y, p1.percent, p1.shield_strength, p1.facing, p1.action.value, p1.action_frame, 
@@ -124,14 +135,22 @@ class SSBMEnv(gym.Env):
                              self.gamestate.distance, p2.character.value, p2.x, p2.y, p2.percent, p2.shield_strength, p2.facing, p2.action.value, p2.action_frame, 
                              float(p2.invulnerable), p2.invulnerability_left, float(p2.hitlag), p2.hitstun_frames_left, p2.jumps_left, 
                              float(p2.on_ground), p2.speed_air_x_self, p2.speed_y_self, p2.speed_x_attack, p2.speed_y_attack, p2.speed_ground_x_self])
-        return p1_state, p2_state
+
+        observations = [p1_state, p2_state]
+        obs_dict = { agent_name : observations[i] for i, agent_name in enumerate(self.agents) }
+
+        return obs_dict
 
     def _get_done(self):
-        return self.gamestate.player[self.ctrlr_port].action.value <= 0xa or self.gamestate.player[self.ctrlr_op_port].action.value <= 0xa
+        done =  self.gamestate.player[self.ctrlr_port].action.value <= 0xa or self.gamestate.player[self.ctrlr_op_port].action.value <= 0xa
+        return {'__all__' : done }
 
     def _get_info(self):
         # TODO write frames skipped to info  (I think if we miss more than 6 frames between steps we might be in trouble)
-        return {}
+        info = {}
+        for agent in self.agents:
+            info[agent] = {}
+        return info
     
     def _perform_action(self, player, action_idx):
         if action_idx == 0:
@@ -186,8 +205,6 @@ class SSBMEnv(gym.Env):
     def _step_through_menu(self):
         # Step through main menu, player select, stage select scenes # TODO: include frame processing warning stuff
         self.gamestate = self.console.step()
-        self.ctrlr_port = melee.gamestate.port_detector(self.gamestate, self.ctrlr, self.char1) 
-        self.ctrlr_op_port = melee.gamestate.port_detector(self.gamestate, self.ctrlr_op, self.char2)
         menu_helper = melee.MenuHelper(controller_1=self.ctrlr,
                                         controller_2=self.ctrlr_op,
                                         character_1_selected=self.char1,
@@ -207,20 +224,29 @@ class SSBMEnv(gym.Env):
                 self.logger.writeframe()
         
     def _stop_dolphin(self):
+        print("STOPPING DOLPHIN")
         if self.console:
             self.console.stop()
             time.sleep(self.DOLPHIN_SHUTDOWN_TIME)
         self._is_dolphin_running = False
     
-    def step(self, action): # step should advance our state (in the form of the obs space)
+    def step(self, joint_action): # step should advance our state (in the form of the obs space)
+        if set(joint_action.keys()).intersection(self.agents) != set(joint_action.keys()).union(self.agents):
+            raise ValueError("Invalid agent in action dictionary!")
+
         # why do we need to do this?
         self.ctrlr_port = melee.gamestate.port_detector(self.gamestate, self.ctrlr, self.char1) 
         self.ctrlr_op_port = melee.gamestate.port_detector(self.gamestate, self.ctrlr_op, self.char2)
+
+        if self.ctrlr_port != self.ctrlr.port or self.ctrlr_op_port != self.ctrlr_op.port:
+            raise RuntimeError("Controller port inconsistency!")
         
         prev_gamestate = self.gamestate
         # perform actions
-        self._perform_action(0, action["player"])
-        self._perform_action(1, action["player_op"])
+        for agent_idx, agent in enumerate(self.agents):
+            action = joint_action[agent]
+            self._perform_action(agent_idx, action)
+        
         # step env
         self.gamestate = self.console.step()
         # collect reward
@@ -230,10 +256,10 @@ class SSBMEnv(gym.Env):
         done = self._get_done()
         info = self._get_info()
 
-        if done:
+        if done['__all__']:
             self._stop_dolphin()
         
-        return (state[0], reward[0], done, info), (state[1], reward[1], done, info)
+        return state, reward, done, info
 
     def reset(self):    # TODO: should reset state to initial state, how to do this?
         if self._is_dolphin_running:
@@ -242,10 +268,21 @@ class SSBMEnv(gym.Env):
         # hashtag JustDolphinThings
         self._start_dolphin()
         self._step_through_menu()
+
+        if self.symmetric:
+            self.agents = ['ai_1', 'ai_2']
+        else:
+            self.agents = ['ai_1']
+
+        self.ctrlr_port = melee.gamestate.port_detector(self.gamestate, self.ctrlr, self.char1) 
+        self.ctrlr_op_port = melee.gamestate.port_detector(self.gamestate, self.ctrlr_op, self.char2)
+
+        if self.ctrlr_port != self.ctrlr.port or self.ctrlr_op_port != self.ctrlr_op.port:
+            raise RuntimeError("Controller port inconsistency!")
         
         # Return initial observation
-        state = self._get_state()
-        return state
+        joint_obs = self._get_state()
+        return joint_obs
 
     
     def render(self, mode='human', close=False):    # FIXME: changing this parameter does nothing rn??
@@ -278,5 +315,15 @@ if __name__ == "__main__":
         if curr_time > 18:
             start_time = time.time()
             ssbm_env.reset()
-        done = ssbm_env.step({"player": 35, "player_op": 0})[0][2]
-        done = ssbm_env.step({"player": 31, "player_op": 0})[0][2]
+        
+        # Perform first part of upsmash
+        joint_action = {'ai_1' : 35}
+        if not args.cpu:
+            joint_action['ai_2'] = 0
+        done = ssbm_env.step(joint_action)[2]['__all__']
+
+        # Perform second part of upsmash
+        joint_action = {'ai_1' : 31}
+        if not args.cpu:
+            joint_action['ai_2'] = 0
+        done = ssbm_env.step(joint_action)[2]['__all__']
