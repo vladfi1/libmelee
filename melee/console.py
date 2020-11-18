@@ -158,7 +158,7 @@ class Console:
                 if not using the default
         """
         if self.is_dolphin and self.path:
-            exe_name = "Slippi Dolphin"
+            exe_name = "dolphin-emu"
             if platform.system() == "Windows":
                 exe_name = "Dolphin.exe"
 

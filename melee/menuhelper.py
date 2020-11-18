@@ -66,18 +66,18 @@ class MenuHelper():
             gamestate (gamestate.GameState): The current gamestate
         """
         if self.level not in range(1, 10):
-            raise ValueError("CPU level must be in [1, 9] but {} was specified".format(level))
+            raise ValueError("CPU level must be in [1, 9] but {} was specified".format(self.level))
 
         # If we're at the character select screen, choose our character
         if gamestate.menu_state in [enums.Menu.CHARACTER_SELECT, enums.Menu.SLIPPI_ONLINE_CSS]:
             if gamestate.submenu == enums.SubMenu.NAME_ENTRY_SUBMENU:
                 self.name_tag_index = self.enter_direct_code(gamestate=gamestate,
-                                                           controller=controller_1,
-                                                           connect_code=connect_code,
+                                                           controller=self.controller_1,
+                                                           connect_code=self.connect_code,
                                                            index=self.name_tag_index)
             else:
                 if self.verbose:
-                    print("Player {} selecting character {}".format(port_1, character_1_selected))
+                    print("Player {} selecting character {}".format(self.controller_1.port, self.character_1_selected))
                 self.choose_character(character=self.character_1_selected,
                                             gamestate=gamestate,
                                             controller=self.controller_1,
@@ -88,7 +88,7 @@ class MenuHelper():
                                             level=self.level)
 
                 if self.verbose:
-                    print("Player {} selecting character {}".format(port_2, character_2_selected))
+                    print("Player {} selecting character {}".format(self.controller_2.port, self.character_2_selected))
                 self.choose_character(character=self.character_2_selected,
                                             gamestate=gamestate,
                                             controller=self.controller_2,
@@ -277,8 +277,12 @@ class MenuHelper():
         if done and isSlippiCSS:
             if self.verbose:
                 print("done in slippi online")
-            controller.press_button(enums.Button.BUTTON_START)
+            if gamestate.frame % 2 == 0:
+                controller.release_all()
+            else:
+                controller.press_button(enums.Button.BUTTON_START)
             return
+                
 
 
         # We are already set and don't want to start, so let's taunt our opponent
@@ -327,13 +331,17 @@ class MenuHelper():
         if done:
             if self.verbose:
                 print("done")
+            # Presses have to happen >=2 frames apart
+            if gamestate.frame % 2 == 0:
+                controller.release_all()
+                return
             # Start if we can and should
-            if start and gamestate.ready_to_start and controller.prev.button[enums.Button.BUTTON_START] == False:
+            if start and (gamestate.ready_to_start == 0):
                 if self.verbose:
                     print("starting")
                 controller.press_button(enums.Button.BUTTON_START)
                 return
-            # No futher action necessary
+            # No further action necessary
             else:
                 controller.release_all()
                 return
@@ -683,7 +691,7 @@ class MenuHelper():
             controller.release_all()
 
     def print_location(self, gamestate, controller):
-        if port not in gamestate.player:
+        if controller.port not in gamestate.player:
             return
 
         my_state = gamestate.player[controller.port]
