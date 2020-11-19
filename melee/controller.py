@@ -4,7 +4,6 @@ import platform
 import sys
 import copy
 import time
-import serial
 try:
     import win32file
     import pywintypes
@@ -339,7 +338,7 @@ class Controller:
         It doesn't get sent to the console until you flush
         """
         if self.verbose:
-            print("Contoller {} is flushing".format(port))
+            print("Contoller {} is flushing".format(self.port))
         # Move the current controller state into the previous one
         self.prev = copy.copy(self.current)
 

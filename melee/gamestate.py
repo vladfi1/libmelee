@@ -10,7 +10,7 @@ class GameState(object):
     __slots__ = ('frame', 'stage', 'menu_state', 'submenu', 'player', 'projectiles', 'stage_select_cursor_x',
                  'stage_select_cursor_y', 'ready_to_start', 'distance', 'menu_selection', '_newframe')
     def __init__(self):
-        self.frame = -9999
+        self.frame = -10000
         """int: The current frame number. Monotonically increases. Can be negative."""
         self.stage = enums.Stage.FINAL_DESTINATION
         """enums.Stage: The current stage being played on"""
@@ -29,7 +29,7 @@ class GameState(object):
         self.ready_to_start = False
         """(bool): Is the 'ready to start' banner showing at the character select screen?"""
         self.distance = 0.0
-        """(float): Euclidian distance between the two players. (or closest one for climbers)"""
+        """(float): Euclidian distance between the two players. (or just Popo for climbers)"""
         self.menu_selection = 0
         """(int): The index of the selected menu item for when in menus."""
         self._newframe = True
@@ -41,10 +41,10 @@ class PlayerState(object):
                  'jumps_left', 'on_ground', 'speed_air_x_self', 'speed_y_self', 'speed_x_attack', 'speed_y_attack',
                  'speed_ground_x_self', 'cursor_x', 'cursor_y', 'coin_down', 'controller_status', 'off_stage', 'iasa',
                  'moonwalkwarning', 'controller_state', 'ecb_bottom', 'ecb_top', 'ecb_left', 'ecb_right', 'prev_action',
-                 '_next_x', '_next_y', '_prev_x', '_prev_y')
+                 'costume', '_next_x', '_next_y', '_prev_x', '_prev_y', 'cpu_level', 'is_holding_cpu_slider', 'nana')
     def __init__(self):
         # This value is what the character currently is IN GAME
-        #   So this will have no meaning while in menus'speed_y_self'
+        #   So this will have no meaning while in menus
         #   Also, this will change dynamically if you change characters
         #       IE: Shiek/Zelda
         self.character = enums.Character.UNKNOWN_CHARACTER
@@ -91,6 +91,11 @@ class PlayerState(object):
         """(float): Attack-induced vertical speed"""
         self.speed_ground_x_self = 0
         """(float): Self-induced horizontal ground speed"""
+        self.nana = None
+        """(enums.PlayerState): Additional player state for Nana, if applicable.
+                If the character is not Ice Climbers, Nana will be None.
+                Will also be None if this player state is Nana itself.
+                Lastly, the secondary climber is called 'Nana' here, regardless of the costume used."""
         self.cursor_x = 0
         """(float): Cursor X value"""
         self.cursor_y = 0
@@ -114,6 +119,12 @@ class PlayerState(object):
         """(float, float): Top edge of the ECB. (x, y) offset from player's center."""
         self.ecb_bottom = (0, 0)
         """(float, float): Bottom edge of the ECB. (x, y) offset from player's center."""
+        self.costume = 0
+        """(int): Index for which costume the player is wearing"""
+        self.cpu_level = False
+        """(bool): CPU level of player. 0 for a libmelee-controller bot or human player."""
+        self.is_holding_cpu_slider = False
+        """(bool): Is the player holding the CPU slider in the character select screen?"""
         # self.hitbox_1_size = 0
         # self.hitbox_2_size = 0
         # self.hitbox_3_size = 0
@@ -154,25 +165,25 @@ class Projectile:
         self.subtype = enums.ProjectileSubtype.UNKNOWN_PROJECTILE
         """(enums.ProjectileSubtype): Which actual projectile type this is"""
 
-def port_detector(gamestate, controller, character):
-    """Autodiscover what port the given controller is on
+def port_detector(gamestate, character):
+    """Autodiscover what port the given character is on
 
     Slippi Online assigns us a random port when playing online. Find out which we are
 
     Returns:
-        [1-4]: The given controller belongs to the returned port
-        0: We don't know yet, and we pressed a button to discover. Don't press
-        any other buttons this frame or it'll mess this up!!
+        [1-4]: The given character belongs to the returned port
+        0: We don't know.
 
     Args:
         gamestate: Current gamestate
-        controller: The controller we want to test
         character: The character we know we picked
+        costume: Costume index we picked
     """
+    detected_port = 0
     for i, player in gamestate.player.items():
         if player.character == character:
-            return i
+            if detected_port > 0:
+                return 0
+            detected_port = i
 
-    # TODO Do some movement
-
-    return 1
+    return detected_port

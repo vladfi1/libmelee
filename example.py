@@ -6,7 +6,7 @@ import melee
 import time
 
 # This example program demonstrates how to use the Melee API to run a console,
-#   setup controllers, and send button presses over to a console (dolphin or Slippi/Wii)
+#   setup controllers, and send button presses over to a console
 
 def check_port(value):
     ivalue = int(value)
@@ -24,9 +24,6 @@ parser.add_argument('--opponent', '-o', type=check_port,
                     default=2)
 parser.add_argument('--debug', '-d', action='store_true',
                     help='Debug mode. Creates a CSV of all game states')
-parser.add_argument('--framerecord', '-r', default=False, action='store_true',
-                    help='(DEVELOPMENT ONLY) Records frame data from the match,' \
-                    'stores into framedata.csv.')
 parser.add_argument('--address', '-a', default="127.0.0.1",
                     help='IP address of Slippi/Wii')
 parser.add_argument('--dolphin_executable_path', '-e', default=None,
@@ -50,10 +47,6 @@ log = None
 if args.debug:
     log = melee.Logger()
 
-# This frame data object contains lots of helper functions and values for looking up
-#   various Melee stats, hitboxes, and physics calculations
-framedata = melee.FrameData(args.framerecord)
-
 # Create our Console object.
 #   This will be one of the primary objects that we will interface with.
 #   The Console represents the virtual or hardware system Melee is playing on.
@@ -61,14 +54,7 @@ framedata = melee.FrameData(args.framerecord)
 #       bot can actually "see" what's happening in the game
 console = melee.Console(path=args.dolphin_executable_path,
                         slippi_address=args.address,
-                        slippi_port=51441,
-                        blocking_input=False,
-                        polling_mode=False,
                         logger=log)
-
-# Dolphin has an optional mode to not render the game's visuals
-#   This is useful for BotvBot matches
-console.render = True
 
 # Create our Controller object
 #   The controller is the second primary object your bot will interact with
@@ -93,8 +79,6 @@ def signal_handler(sig, frame):
         print("") #because the ^C will be on the terminal
         print("Log file created: " + log.filename)
     print("Shutting down cleanly...")
-    if args.framerecord:
-        framedata.save_recording()
     sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -107,6 +91,7 @@ print("Connecting to console...")
 if not console.connect():
     print("ERROR: Failed to connect to the console.")
     sys.exit(-1)
+print("Console connected")
 
 # Plug our controller in
 #   Due to how named pipes work, this has to come AFTER running dolphin
@@ -132,6 +117,8 @@ menu_helper = melee.MenuHelper(controller_1=controller,
                                 make_cpu=args.cpu,
                                 level=args.cpu_level,
                                 verbose=args.verbose)
+
+costume = 0
 
 # Main loop
 while True:

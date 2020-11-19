@@ -235,9 +235,9 @@ class SSBMEnv(gym.Env):
             raise ValueError("Invalid agent in action dictionary!")
 
         # why do we need to do this?
-        self.ctrlr_port = melee.gamestate.port_detector(self.gamestate, self.ctrlr, self.char1) 
-        self.ctrlr_op_port = melee.gamestate.port_detector(self.gamestate, self.ctrlr_op, self.char2)
-
+        self.ctrlr_port = melee.gamestate.port_detector(self.gamestate, self.char1) 
+        self.ctrlr_op_port = melee.gamestate.port_detector(self.gamestate, self.char2)
+        
         if self.ctrlr_port != self.ctrlr.port or self.ctrlr_op_port != self.ctrlr_op.port:
             raise RuntimeError("Controller port inconsistency!")
         
@@ -274,9 +274,9 @@ class SSBMEnv(gym.Env):
         else:
             self.agents = ['ai_1']
 
-        self.ctrlr_port = melee.gamestate.port_detector(self.gamestate, self.ctrlr, self.char1) 
-        self.ctrlr_op_port = melee.gamestate.port_detector(self.gamestate, self.ctrlr_op, self.char2)
-
+        self.ctrlr_port = melee.gamestate.port_detector(self.gamestate, self.char1) 
+        self.ctrlr_op_port = melee.gamestate.port_detector(self.gamestate, self.char2)
+        
         if self.ctrlr_port != self.ctrlr.port or self.ctrlr_op_port != self.ctrlr_op.port:
             raise RuntimeError("Controller port inconsistency!")
         
@@ -323,7 +323,8 @@ if __name__ == "__main__":
         done = ssbm_env.step(joint_action)[2]['__all__']
 
         # Perform second part of upsmash
-        joint_action = {'ai_1' : 31}
-        if not args.cpu:
-            joint_action['ai_2'] = 0
-        done = ssbm_env.step(joint_action)[2]['__all__']
+        if not done:
+            joint_action = {'ai_1' : 31}
+            if not args.cpu:
+                joint_action['ai_2'] = 0
+            done = ssbm_env.step(joint_action)[2]['__all__']

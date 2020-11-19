@@ -5,9 +5,11 @@ is your method to start and stop Dolphin, set configs, and get the latest GameSt
 """
 
 from collections import defaultdict
+from packaging import version
 
 import time
 import os
+import stat
 import configparser
 import csv
 import subprocess
@@ -16,6 +18,8 @@ import math
 import base64
 import numpy as np
 from pathlib import Path
+import shutil
+import tempfile
 
 from melee import enums
 from melee.gamestate import GameState, Projectile, Action, PlayerState
@@ -29,6 +33,22 @@ class SlippiVersionTooLow(Exception):
     def __init__(self, message):
         self.message = message
 
+class InvalidDolphinPath(Exception):
+    """Raised when given path to Dolphin is invalid"""
+    def __init__(self, message):
+        self.message = message
+
+def _ignore_fifos(src, names):
+    fifos = []
+    for name in names:
+        path = os.path.join(src, name)
+        if stat.S_ISFIFO(os.stat(path).st_mode):
+            fifos.append(name)
+    return fifos
+
+def _copytree_safe(src, dst):
+    shutil.copytree(src, dst, ignore=_ignore_fifos)
+
 # pylint: disable=too-many-instance-attributes
 class Console:
     """The console object that represents your Dolphin / Wii / SLP file
@@ -36,6 +56,8 @@ class Console:
     def __init__(self,
                  path=None,
                  is_dolphin=True,
+                 dolphin_home_path=None,
+                 tmp_home_directory=True,
                  slippi_address="127.0.0.1",
                  slippi_port=51441,
                  online_delay=2,
@@ -48,6 +70,10 @@ class Console:
         Args:
             path (str): Path to the directory where your dolphin executable is located.
                 If None, will assume the dolphin is remote and won't try to configure it.
+            dolphin_home_path (str): Path to dolphin user directory. Optional.
+            is_dolphin (bool): Is this console a dophin instance, or SLP file?
+            tmp_home_directory (bool): Use a temporary directory for the dolphin User path
+                This is useful so instances don't interfere with each other.
             slippi_address (str): IP address of the Dolphin / Wii to connect to.
             slippi_port (int): UDP port that slippi will listen on
             online_delay (int): How many frames of delay to apply in online matches
@@ -64,6 +90,13 @@ class Console:
         self.logger = logger
         self.is_dolphin = is_dolphin
         self.path = path
+        self.dolphin_home_path = dolphin_home_path
+        if tmp_home_directory:
+            temp_dir = tempfile.mkdtemp(prefix='libmelee_')
+            temp_dir += "/User/"
+            _copytree_safe(self._get_dolphin_home_path(), temp_dir)
+            self.dolphin_home_path = temp_dir
+
         self.processingtime = 0
         self._frametimestamp = time.time()
         self.slippi_address = slippi_address
@@ -71,8 +104,6 @@ class Console:
         self.slippi_port = slippi_port
         """(int): UDP port of slippi server. Default 51441"""
         self.eventsize = [0] * 0x100
-        self.render = True
-        """(bool): Should dolphin render the game live?"""
         self.connected = False
         self.nick = ""
         """(str): The nickname the console has given itself."""
@@ -86,6 +117,9 @@ class Console:
         self.slp_version = "unknown"
         """(str): The SLP version this stream/file currently is."""
         self._allow_old_version = allow_old_version
+        self._use_manual_bookends = False
+        self._costumes = {0:0, 1:0, 2:0, 3:0}
+        self._cpu_level = {0:0, 1:0, 2:0, 3:0}
 
         # Keep a running copy of the last gamestate produced
         self._prev_gamestate = GameState()
@@ -96,9 +130,11 @@ class Console:
             self._slippstream = SlippstreamClient(self.slippi_address, self.slippi_port)
             if self.path:
                 # Setup some dolphin config options
-                dolphin_config_path = self._get_dolphin_config_path() + "Dolphin.ini"
+                dolphin_ini_path = self._get_dolphin_config_path() + "Dolphin.ini"
+                if not os.path.isfile(dolphin_ini_path):
+                    raise InvalidDolphinPath(self._get_dolphin_config_path())
                 config = configparser.SafeConfigParser()
-                config.read(dolphin_config_path)
+                config.read(dolphin_ini_path)
                 config.set("Core", 'slippienablespectator', "True")
                 config.set("Core", 'slippispectatorlocalport', str(self.slippi_port))
                 # Set online delay
@@ -106,7 +142,7 @@ class Console:
                 # Turn on background input so we don't need to have window focus on dolphin
                 config.set("Input", 'backgroundinput', "True")
                 config.set("Core", 'BlockingPipes', str(blocking_input))
-                with open(dolphin_config_path, 'w') as dolphinfile:
+                with open(dolphin_ini_path, 'w') as dolphinfile:
                     config.write(dolphinfile)
         else:
             self._slippstream = SLPFileStreamer(self.path)
@@ -139,14 +175,53 @@ class Console:
         Returns:
             True is successful, False otherwise
         """
-        # It can take a short amount of time after starting the emulator
-        #   for the actual server to start. So try a few times before giving up.
-        for _ in range(4):
-            if self._slippstream.connect():
-                return True
-        return False
+        return self._slippstream.connect()
 
-    def run(self, iso_path=None, dolphin_config_path=None):
+    def _get_dolphin_home_path(self):
+        """Return the path to dolphin's home directory"""
+        if self.path:
+            return os.path.join(self.path, os.pardir, "Resources", "User") + '/'
+
+        home_path = str(Path.home())
+        legacy_config_path = home_path + "/.dolphin-emu/"
+
+        #Are we using a legacy Linux home path directory?
+        if os.path.isdir(legacy_config_path):
+            return legacy_config_path
+
+        #Are we on OSX?
+        osx_path = home_path + "/Library/Application Support/Dolphin/"
+        if os.path.isdir(osx_path):
+            return osx_path
+
+        #Are we on a new Linux distro?
+        linux_path = home_path + "/.local/share/dolphin-emu/"
+        if os.path.isdir(linux_path):
+            return linux_path
+
+        raise FileNotFoundError("Could not find dolphin home directory.")
+
+    def _get_dolphin_config_path(self):
+        """ Return the path to dolphin's config directory
+        (which is not necessarily the same as the home path)"""
+        if self.path:
+            # If this is an appimage install
+            if platform.system() == "Linux" and os.path.isfile(self.path):
+                return str(Path.home()) + "/.config/SlippiOnline/Config/"
+            return os.path.join(self._get_dolphin_home_path(), 'Config') + '/'
+        return ""
+
+    def get_dolphin_pipes_path(self, port):
+        """Get the path of the named pipe input file for the given controller port
+        """
+        if platform.system() == "Windows":
+            return '\\\\.\\pipe\\slippibot' + str(port)
+        pipes_path = self._get_dolphin_home_path() + "/Pipes/"
+        if not os.path.isdir(pipes_path):
+            os.makedirs(pipes_path, exist_ok=True)
+        return pipes_path + f"slippibot{port}"
+
+    def run(self, iso_path=None, dolphin_user_path=None, environment_vars=None):
         """Run the Dolphin emulator.
 
         This starts the Dolphin process, so don't run this if you're connecting to an
@@ -154,31 +229,36 @@ class Console:
 
         Args:
             iso_path (str, optional): Path to Melee ISO for dolphin to read
-            dolphin_config_path (str, optional): Alternative config path for dolphin
+            dolphin_user_path (str, optional): Alternative user path for dolphin
                 if not using the default
+            environment_vars (dict, optional): Dict (string->string) of environment variables to set
         """
-        if self.is_dolphin and self.path:
-            exe_name = "dolphin-emu"
-            if platform.system() == "Windows":
-                exe_name = "Dolphin.exe"
+        assert self.is_dolphin and self.path
 
-            exe_path = ""
-            if self.path:
-                exe_path = self.path
-            command = [exe_path + "/" + exe_name]
-            if platform.system() == "Linux" and os.path.isfile(self.path):
-                command = [self.path]
-            if not self.render:
-                #Use the "Null" renderer
-                command.append("-v")
-                command.append("Null")
-            if iso_path is not None:
-                command.append("-e")
-                command.append(iso_path)
-            if dolphin_config_path is not None:
-                command.append("-u")
-                command.append(dolphin_config_path)
-            self._process = subprocess.Popen(command)
+        dolphin_user_path = dolphin_user_path or self._get_dolphin_home_path()
+
+        exe_name = "dolphin-emu"
+        if platform.system() == "Windows":
+            exe_name = "Dolphin.exe"
+
+        exe_path = ""
+        if self.path:
+            exe_path = self.path
+        command = [exe_path + "/" + exe_name]
+
+        # AppImage
+        if platform.system() == "Linux" and os.path.isfile(self.path):
+            command = [self.path]
+
+        if iso_path is not None:
+            command.append("-e")
+            command.append(iso_path)
+        command.append("-u")
+        command.append(dolphin_user_path)
+        env = os.environ.copy()
+        if environment_vars is not None:
+            env.update(environment_vars)
+        self._process = subprocess.Popen(command, env=env)
 
     def stop(self):
         """ Stop the console.
@@ -292,7 +372,8 @@ class Console:
                     if len(message["payload"]) > 0:
                         self.__handle_slippstream_menu_event(base64.b64decode(message["payload"]), self._temp_gamestate)
                         frame_ended = True
-                elif message["type"] == "frame_end" and self._frame != -10000:
+
+                elif self._use_manual_bookends and message["type"] == "frame_end" and self._frame != -10000:
                     frame_ended = True
             else:
                 return None
@@ -334,6 +415,7 @@ class Console:
 
             elif EventType(event_bytes[0]) == EventType.GAME_END:
                 event_bytes = event_bytes[event_size:]
+                return self._use_manual_bookends
 
             elif EventType(event_bytes[0]) == EventType.PRE_FRAME:
                 self.__pre_frame(gamestate, event_bytes)
@@ -370,14 +452,25 @@ class Console:
         self._frame = -10000
         major = np.ndarray((1,), ">B", event_bytes, 0x1)[0]
         minor = np.ndarray((1,), ">B", event_bytes, 0x2)[0]
-        version = np.ndarray((1,), ">B", event_bytes, 0x3)[0]
-        self.slp_version = str(major) + "." + str(minor) + "." + str(version)
+        version_num = np.ndarray((1,), ">B", event_bytes, 0x3)[0]
+        self.slp_version = str(major) + "." + str(minor) + "." + str(version_num)
+        self._use_manual_bookends = self._allow_old_version and (version.parse(self.slp_version) < version.parse("3.0.0"))
         if major < 3 and not self._allow_old_version:
             raise SlippiVersionTooLow(self.slp_version)
         try:
             self._current_stage = enums.to_internal_stage(np.ndarray((1,), ">H", event_bytes, 0x13)[0])
         except ValueError:
             self._current_stage = enums.Stage.NO_STAGE
+
+        for i in range(4):
+            self._costumes[i] = np.ndarray((1,), ">B", event_bytes, 0x68 + (0x24 * i))[0]
+
+        for i in range(4):
+            self._cpu_level[i] = np.ndarray((1,), ">B", event_bytes, 0x74 + (0x24 * i))[0]
+
+        for i in range(4):
+            if np.ndarray((1,), ">B", event_bytes, 0x66 + (0x24 * i))[0] != 1:
+                self._cpu_level[i] = 0
 
     def __pre_frame(self, gamestate, event_bytes):
         # Grab the physical controller state and put that into the controller state
@@ -387,6 +480,14 @@ class Console:
             gamestate.player[controller_port] = PlayerState()
         playerstate = gamestate.player[controller_port]
 
+        # Is this Nana?
+        if np.ndarray((1,), ">B", event_bytes, 0x6)[0] == 1:
+            playerstate.nana = PlayerState()
+            playerstate = playerstate.nana
+
+        playerstate.costume = self._costumes[controller_port-1]
+        playerstate.cpu_level = self._cpu_level[controller_port-1]
+
         main_x = (np.ndarray((1,), ">f", event_bytes, 0x19)[0] / 2) + 0.5
         main_y = (np.ndarray((1,), ">f", event_bytes, 0x1D)[0] / 2) + 0.5
         playerstate.controller_state.main_stick = (main_x, main_y)
@@ -394,6 +495,11 @@ class Console:
         c_x = (np.ndarray((1,), ">f", event_bytes, 0x21)[0] / 2) + 0.5
         c_y = (np.ndarray((1,), ">f", event_bytes, 0x25)[0] / 2) + 0.5
         playerstate.controller_state.c_stick = (c_x, c_y)
+
+        # The game interprets both shoulders together, so the processed value will always be the same
+        trigger = (np.ndarray((1,), ">f", event_bytes, 0x29)[0])
+        playerstate.controller_state.l_shoulder = trigger
+        playerstate.controller_state.r_shoulder = trigger
 
         buttonbits = np.ndarray((1,), ">H", event_bytes, 0x31)[0]
         playerstate.controller_state.button[enums.Button.BUTTON_A] = bool(int(buttonbits) & 0x0100)
@@ -408,7 +514,7 @@ class Console:
         playerstate.controller_state.button[enums.Button.BUTTON_D_RIGHT] = bool(int(buttonbits) & 0x0002)
         playerstate.controller_state.button[enums.Button.BUTTON_D_DOWN] = bool(int(buttonbits) & 0x0004)
         playerstate.controller_state.button[enums.Button.BUTTON_D_UP] = bool(int(buttonbits) & 0x0008)
-        if self._allow_old_version:
+        if self._use_manual_bookends:
             self._frame = gamestate.frame
 
     def __post_frame(self, gamestate, event_bytes):
@@ -418,8 +524,13 @@ class Console:
 
         if controller_port not in gamestate.player:
             gamestate.player[controller_port] = PlayerState()
-
         playerstate = gamestate.player[controller_port]
+
+        # Is this Nana?
+        if np.ndarray((1,), ">B", event_bytes, 0x6)[0] == 1:
+            playerstate.nana = PlayerState()
+            playerstate = playerstate.nana
+
         playerstate.x = np.ndarray((1,), ">f", event_bytes, 0xa)[0]
         playerstate.y = np.ndarray((1,), ">f", event_bytes, 0xe)[0]
 
@@ -511,10 +622,13 @@ class Console:
             playerstate.moonwalkwarning = False
 
         # "off_stage" helper
-        if (abs(playerstate.x) > stages.EDGE_GROUND_POSITION[gamestate.stage] or \
-                playerstate.y < -6) and not playerstate.on_ground:
-            playerstate.off_stage = True
-        else:
+        try:
+            if (abs(playerstate.x) > stages.EDGE_GROUND_POSITION[gamestate.stage] or \
+                    playerstate.y < -6) and not playerstate.on_ground:
+                playerstate.off_stage = True
+            else:
+                playerstate.off_stage = False
+        except KeyError:
             playerstate.off_stage = False
 
         # ECB top edge, x
@@ -572,7 +686,7 @@ class Console:
         except TypeError:
             ecb_right_y = 0
         playerstate.ecb_right = (ecb_right_x, ecb_right_y)
-        if self._allow_old_version:
+        if self._use_manual_bookends:
             self._frame = gamestate.frame
 
     def __frame_bookend(self, gamestate, event_bytes):
@@ -612,9 +726,8 @@ class Console:
 
     def __handle_slippstream_menu_event(self, event_bytes, gamestate):
         """ Internal handler for slippstream menu events
-
         Modifies specified gamestate based on the event bytes
-         """
+            """
         scene = np.ndarray((1,), ">H", event_bytes, 0x1)[0]
         if scene == 0x02:
             gamestate.menu_state = enums.Menu.CHARACTER_SELECT
@@ -623,7 +736,7 @@ class Console:
             gamestate.player[2] = PlayerState()
             gamestate.player[3] = PlayerState()
             gamestate.player[4] = PlayerState()
-        elif scene == 0x0102:
+        elif scene in [0x0102, 0x0108]:
             gamestate.menu_state = enums.Menu.STAGE_SELECT
         elif scene == 0x0202:
             gamestate.menu_state = enums.Menu.IN_GAME
@@ -724,52 +837,47 @@ class Console:
         except TypeError:
             gamestate.menu_selection = 0
 
-    def _get_dolphin_home_path(self):
-        """Return the path to dolphin's home directory"""
-        if self.path:
-            return os.path.join(self.path, os.pardir, "Resources", "User") + '/'
+        # Online costume chosen
+        try:
+            if gamestate.menu_state == enums.Menu.SLIPPI_ONLINE_CSS:
+                for i in range(4):
+                    gamestate.player[i+1].costume = np.ndarray((1,), ">B", event_bytes, 0x3F)[0]
+        except TypeError:
+            pass
 
-        home_path = str(Path.home())
-        legacy_config_path = home_path + "/.dolphin-emu/"
+        # This value is 0x05 in the nametag entry
+        try:
+            if gamestate.menu_state == enums.Menu.SLIPPI_ONLINE_CSS:
+                nametag = np.ndarray((1,), ">B", event_bytes, 0x40)[0]
+                if nametag == 0x05:
+                    gamestate.submenu = enums.SubMenu.NAME_ENTRY_SUBMENU
+                elif nametag == 0x00:
+                    gamestate.submenu = enums.SubMenu.ONLINE_CSS
+        except TypeError:
+            pass
 
-        #Are we using a legacy Linux home path directory?
-        if os.path.isdir(legacy_config_path):
-            return legacy_config_path
+        # CPU Level
+        try:
+            for i in range(4):
+                gamestate.player[i+1].cpu_level = np.ndarray((1,), ">B", event_bytes, 0x41 + i)[0]
+        except TypeError:
+            pass
+        except KeyError:
+            pass
 
-        #Are we on OSX?
-        osx_path = home_path + "/Library/Application Support/Dolphin/"
-        if os.path.isdir(osx_path):
-            return osx_path
+        # Is Holding CPU Slider
+        try:
+            for i in range(4):
+                gamestate.player[i+1].is_holding_cpu_slider = np.ndarray((1,), ">B", event_bytes, 0x45 + i)[0]
+        except TypeError:
+            pass
+        except KeyError:
+            pass
 
-        #Are we on a new Linux distro?
-        linux_path = home_path + "/.local/share/dolphin-emu/"
-        if os.path.isdir(linux_path):
-            return linux_path
-
-        print("ERROR: Are you sure Dolphin is installed? Make sure it is, and then run again.")
-        return ""
-
-    def _get_dolphin_config_path(self):
-        """ Return the path to dolphin's config directory
-        (which is not necessarily the same as the home path)"""
-        if self.path:
-            # If this is an appimage install
-            if platform.system() == "Linux" and os.path.isfile(self.path):
-                return str(Path.home()) + "/.config/SlippiOnline/Config/"
-            return os.path.join(self._get_dolphin_home_path(), 'Config') + '/'
-        return ""
-
-    def get_dolphin_pipes_path(self, port):
-        """Get the path of the named pipe input file for the given controller port
-        """
-        if platform.system() == "Windows":
-            return '\\\\.\\pipe\\slippibot' + str(port)
-        # If this is an appimage install
-        if platform.system() == "Linux" and os.path.isfile(self.path):
-            if not os.path.isdir(str(Path.home()) + "/.config/SlippiOnline/Pipes/"):
-                os.mkdir(str(Path.home()) + "/.config/SlippiOnline/Pipes/")
-            return str(Path.home()) + "/.config/SlippiOnline/Pipes/slippibot" + str(port)
-        return self._get_dolphin_home_path() + "/Pipes/slippibot" + str(port)
+        # Set CPU level to 0 if we're not a CPU
+        for port in gamestate.player:
+            if gamestate.player[port].controller_status != enums.ControllerStatus.CONTROLLER_CPU:
+                gamestate.player[port].cpu_level = 0
 
     def __fixframeindexing(self, gamestate):
         """ Melee's indexing of action frames is wildly inconsistent.

@@ -33,6 +33,8 @@ class MenuHelper():
             character_2_selected (enums.Character): The character that controller_2 will play as
             stage_selected (enums.Stage): The stage your bot will choose to play on
             connect_code (str): The connect code to direct match with. Leave blank for VS mode.
+            cpu_level (int): What CPU level to set this to. 0 for human/bot controlled.
+            costume (int): Costume index chosen
             autostart (bool): Automatically start the game when it's ready.
                 Useful for BotvBot matches where no human is there to start it.
             swag (bool): What it sounds like
@@ -53,9 +55,9 @@ class MenuHelper():
         self.verbose = verbose
         self.name_tag_index = 0
         self.inputs_live = False
-        self.cpu_level = -1
         self.cpu_toggled = False
         self.cpu_level_toggled = False
+        self.cpu_level = -1
 
     def step(self, gamestate):
         """
@@ -201,34 +203,35 @@ class MenuHelper():
         # Figure out where the character is on the select screen
         # NOTE: This assumes you have all characters unlocked
         # Positions will be totally wrong if something is not unlocked
-        port = controller.port
-        if port not in gamestate.player:
-            if self.verbose:
-                print("port {} not currently in use".format(port))
+        controlling_port = controller.port
+        if controlling_port not in gamestate.player:
             controller.release_all()
             return
 
-        ai_state = gamestate.player[port]
+        ai_state = gamestate.player[controlling_port]
 
         # Discover who is the opponent
         opponent_state = None
         for i, player in gamestate.player.items():
             # TODO For now, just assume they're the first controller port that isn't us
-            if i != port:
+            if i != controlling_port:
                 opponent_state = player
                 break
 
         cursor_x, cursor_y = ai_state.cursor_x, ai_state.cursor_y
         coin_down = ai_state.coin_down
         character_selected = ai_state.character_selected
+
         isSlippiCSS = False
         if gamestate.menu_state == enums.Menu.SLIPPI_ONLINE_CSS:
             cursor_x, cursor_y = gamestate.player[1].cursor_x, gamestate.player[1].cursor_y
             isSlippiCSS = True
             character_selected = gamestate.player[1].character_selected
+        if isSlippiCSS:
+            swag = True
 
-        row = character.value // 9 # enums.Character.PIKACHU.value // 9 -> 1
-        column = character.value % 9 # enums.Character.PIKACHU.value % 9 -> 3
+        row = enums.from_internal(character) // 9
+        column = enums.from_internal(character) % 9
         #The random slot pushes the bottom row over a slot, so compensate for that
         if row == 2:
             column = column+1
@@ -241,120 +244,23 @@ class MenuHelper():
             column = 0
 
         #Height starts at 1, plus half a box height, plus the number of rows
-        target_y = 1 + 3.5 + (row * 7.0) # -> 1 + 3.5 + (1*7) = 11.5
+        target_y = 1 + 3.5 + (row * 7.0)
         #Starts at -32.5, plus half a box width, plus the number of columns
         #NOTE: Technically, each column isn't exactly the same width, but it's close enough
-        target_x = -32.5 + 3.5 + (column * 7.0) # -> -32.5 + 3.5 + (3*7) = -8
+        target_x = -32.5 + 3.5 + (column * 7.0)
         #Wiggle room in positioning character
         wiggleroom = 1.5
 
-        #We want to get to a state where the cursor is NOT over the character,
-        # but it's selected. Thus ensuring the token is on the character
-        isOverCharacter = abs(cursor_x - target_x) < wiggleroom and \
-            abs(cursor_y - target_y) < wiggleroom
-
-        cpu_done = not make_cpu or self.cpu_level == level
-        character_done = character_selected == character
-        done = cpu_done and character_done
-
-        if self.verbose:
-            print("Status:\n")
-            print("Cursor Pos:\t", (cursor_x, cursor_y))
-            print("Target Pos:\t", (target_x, target_y))
-            print("isOverCharacter:\t", isOverCharacter)
-            print("character:\t", character)
-            print("character_selected:\t", character_selected)
-            print("character_done:\t", character_done)
-            print("cpu toggled?\t", self.cpu_toggled)
-            print("cpu slider toggled?\t", self.cpu_level_toggled)
-            print("cpu level:\t", self.cpu_level)
-            print("cpu_done:\t", cpu_done)
-            print("done:\t", done)
-            print("start:\t", start)
-            print("isSlippiCSS:\t", isSlippiCSS)
-
-        # Always start on slippi online games if ready
-        if done and isSlippiCSS:
-            if self.verbose:
-                print("done in slippi online")
-            if gamestate.frame % 2 == 0:
-                controller.release_all()
-            else:
-                controller.press_button(enums.Button.BUTTON_START)
-            return
-                
-
-
-        # We are already set and don't want to start, so let's taunt our opponent
-        if done and swag and not start:
-            if self.verbose:
-                print("done and swagging")
-            delta_x = 3 * math.cos(gamestate.frame / 1.5)
-            delta_y = 3 * math.sin(gamestate.frame / 1.5)
-
-            target_x = opponent_state.cursor_x + delta_x
-            target_y = opponent_state.cursor_y + delta_y
-
-            diff_x = abs(target_x - cursor_x)
-            diff_y = abs(target_y - cursor_y)
-            larger_magnitude = max(diff_x, diff_y)
-
-            # Scale down values to between 0 and 1
-            x = diff_x / larger_magnitude
-            y = diff_y / larger_magnitude
-
-            # Now scale down to be between .5 and 1
-            if cursor_x < target_x:
-                x = (x/2) + 0.5
-            else:
-                x = 0.5 - (x/2)
-            if cursor_y < target_y:
-                y = (y/2) + 0.5
-            else:
-                y = 0.5 - (y/2)
-            controller.tilt_analog(enums.Button.BUTTON_MAIN, x, y)
-            return
-
-        # We are already set and don't want to start or taunt
-        if done and not start:
-            if self.verbose:
-                print("done and waiting")
-            return
-
-
-        #Don't hold down on B, since we'll quit the menu if we do
-        if controller.prev.button[enums.Button.BUTTON_B] == True:
-            controller.release_button(enums.Button.BUTTON_B)
-            return
-
-        # Character is selected and CPU doesn't need to be changed
-        if done:
-            if self.verbose:
-                print("done")
-            # Presses have to happen >=2 frames apart
-            if gamestate.frame % 2 == 0:
-                controller.release_all()
-                return
-            # Start if we can and should
-            if start and (gamestate.ready_to_start == 0):
-                if self.verbose:
-                    print("starting")
-                controller.press_button(enums.Button.BUTTON_START)
-                return
-            # No further action necessary
-            else:
-                controller.release_all()
-                return
-
-        # Need to adjuct CPU settings
-        if character_done and not cpu_done:
+        # Set our CPU level correctly
+        if character_selected == character and (coin_down or cursor_y<0) and make_cpu \
+            and (level != self.cpu_level) or self.cpu_level_toggled:
             if self.verbose:
                 print("Working on CPU")
             # Need to toggle controller input to be a CPU
             if not self.cpu_toggled:
                 if self.verbose:
                     print("Making cpu")
-                t_x, t_y = -45 + 15 * port, -2.5
+                t_x, t_y = -45 + 15 * controlling_port, -2.5
                 room = 1.0
                 # If hand isn't over toggle, move it there
                 if cursor_x > t_x + room or cursor_x < t_x - room or cursor_y > t_y + room or cursor_y < t_y - room:
@@ -393,7 +299,7 @@ class MenuHelper():
             elif make_cpu and not self.cpu_level_toggled:
                 if self.verbose:
                     print('finding cpu level slider')
-                t_x, t_y = -45 + 15 * port, -14.5
+                t_x, t_y = -45 + 15 * controlling_port, -14.5
                 room = 0.5
                 # If hand isn't over toggle, move it there
                 if cursor_x > t_x + room or cursor_x < t_x - room or cursor_y > t_y + room or cursor_y < t_y - room:
@@ -425,7 +331,7 @@ class MenuHelper():
                 if self.verbose:
                     print('sliding cpu level toggle')
                 # Only horizontal position matters for horizonal slider
-                t_x = -46.75 + 15 * port + 1.23 * level
+                t_x = -46.75 + 15 * controlling_port + 1.23 * level
 
                 # Small tolerance because level is very sensitive to slider position
                 room = 0.1
@@ -448,15 +354,69 @@ class MenuHelper():
                     controller.press_button(enums.Button.BUTTON_A)
                     self.cpu_level = level
                     return
-                
+
+        # We are already set, so let's taunt our opponent
+        if character_selected == character and swag and not start:
+            delta_x = 3 * math.cos(gamestate.frame / 1.5)
+            delta_y = 3 * math.sin(gamestate.frame / 1.5)
+
+            target_x = opponent_state.cursor_x + delta_x
+            target_y = opponent_state.cursor_y + delta_y
+
+            diff_x = abs(target_x - cursor_x)
+            diff_y = abs(target_y - cursor_y)
+            larger_magnitude = max(diff_x, diff_y)
+
+            # Scale down values to between 0 and 1
+            x = diff_x / larger_magnitude
+            y = diff_y / larger_magnitude
+
+            # Now scale down to be between .5 and 1
+            if cursor_x < target_x:
+                x = (x/2) + 0.5
+            else:
+                x = 0.5 - (x/2)
+            if cursor_y < target_y:
+                y = (y/2) + 0.5
+            else:
+                y = 0.5 - (y/2)
+            controller.tilt_analog(enums.Button.BUTTON_MAIN, x, y)
+            return
+
+        if character_selected == character and swag and isSlippiCSS:
+            if gamestate.frame % 2 == 0:
+                controller.release_all()
+            else:
+                controller.press_button(enums.Button.BUTTON_Y)
+            return
+
+        #We want to get to a state where the cursor is NOT over the character,
+        # but it's selected. Thus ensuring the token is on the character
+        isOverCharacter = abs(cursor_x - target_x) < wiggleroom and \
+            abs(cursor_y - target_y) < wiggleroom
+
+        #Don't hold down on B, since we'll quit the menu if we do
+        if controller.prev.button[enums.Button.BUTTON_B] == True:
+            controller.release_button(enums.Button.BUTTON_B)
+            return
+
+        #If character is selected, and we're in of the area, and coin is down, then we're good
+        if (character_selected == character) and coin_down:
+            if gamestate.frame % 2 == 0:
+                controller.release_all()
+                return
+            if start and (gamestate.ready_to_start == 0):
+                controller.press_button(enums.Button.BUTTON_START)
+                return
+            else:
+                controller.release_all()
+                return
 
         #release start in addition to anything else
         controller.release_button(enums.Button.BUTTON_START)
 
         #If we're in the right area, select the character
         if isOverCharacter:
-            if self.verbose:
-                print("cursor over character")
             #If we're over the character, but it isn't selected,
             #   then the coin must be somewhere else.
             #   Press B to reclaim the coin
@@ -464,7 +424,7 @@ class MenuHelper():
             controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, .5)
 
             # The slippi menu doesn't have a coin down. We can make-do
-            if isSlippiCSS and not character_done:
+            if isSlippiCSS and (character_selected != character):
                 if gamestate.frame % 5 == 0:
                     controller.press_button(enums.Button.BUTTON_B)
                     controller.release_button(enums.Button.BUTTON_A)
@@ -474,7 +434,7 @@ class MenuHelper():
                     controller.release_button(enums.Button.BUTTON_B)
                     return
 
-            if not character_done and coin_down:
+            if (character_selected != character) and coin_down:
                 controller.press_button(enums.Button.BUTTON_B)
                 controller.release_button(enums.Button.BUTTON_A)
                 return
@@ -487,8 +447,6 @@ class MenuHelper():
                     controller.release_button(enums.Button.BUTTON_A)
                     return
         else:
-            if self.verbose:
-                print("moving cursor towards character")
             #Move in
             controller.release_button(enums.Button.BUTTON_A)
             #Move up if we're too low
@@ -580,7 +538,7 @@ class MenuHelper():
             go to uplugged. If you've ever played Melee, you probably know this. If your
             friend walks away, you have to press the A button on THEIR controller. (or
             else actually unplug the controller) No way around it."""
-        ai_state = gamestate.player[port]
+        ai_state = gamestate.player[controller.port]
         target_x, target_y = 0, -2.2
         if targetport == 1:
             target_x = -31.5
