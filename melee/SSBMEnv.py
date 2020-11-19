@@ -237,7 +237,7 @@ class SSBMEnv(gym.Env):
         # why do we need to do this?
         self.ctrlr_port = melee.gamestate.port_detector(self.gamestate, self.char1) 
         self.ctrlr_op_port = melee.gamestate.port_detector(self.gamestate, self.char2)
-        
+
         if self.ctrlr_port != self.ctrlr.port or self.ctrlr_op_port != self.ctrlr_op.port:
             raise RuntimeError("Controller port inconsistency!")
         
@@ -320,11 +320,13 @@ if __name__ == "__main__":
         joint_action = {'ai_1' : 35}
         if not args.cpu:
             joint_action['ai_2'] = 0
-        done = ssbm_env.step(joint_action)[2]['__all__']
+        obs, reward, done, info = ssbm_env.step(joint_action)
+        done = done['__all__']
 
         # Perform second part of upsmash
         if not done:
             joint_action = {'ai_1' : 31}
             if not args.cpu:
                 joint_action['ai_2'] = 0
-            done = ssbm_env.step(joint_action)[2]['__all__']
+            obs, reward, done, info = ssbm_env.step(joint_action)
+            done = done['__all__']

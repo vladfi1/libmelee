@@ -58,6 +58,8 @@ class MenuHelper():
         self.cpu_toggled = False
         self.cpu_level_toggled = False
         self.cpu_level = -1
+        self.cpu_level_pressed = False
+        self.cpu_level_released = False
 
     def step(self, gamestate):
         """
@@ -339,6 +341,7 @@ class MenuHelper():
                 # If hand isn't over correct cpu level on slider so move it there
                 if cursor_x > t_x + room or cursor_x < t_x - room: 
                     controller.release_button(enums.Button.BUTTON_A)
+                    self.cpu_level_released = True
                     #Move right if we're too left
                     if cursor_x < t_x - room:
                         controller.tilt_analog(enums.Button.BUTTON_MAIN, 0.7, .5) # Note the finer movements
@@ -348,13 +351,28 @@ class MenuHelper():
                     return
                 # Release CPU level slider as it's in correct position
                 else:
-                    if self.verbose:
-                        print("releasing cpu level slider")
                     controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, .5)
-                    controller.press_button(enums.Button.BUTTON_A)
-                    self.cpu_level = level
-                    return
 
+                    # Press and release must happen on two different frames to be properly read by dolphin
+                    if not self.cpu_level_released:
+                        if self.verbose:
+                            print("releasing slider")
+                        controller.release_button(enums.Button.BUTTON_A)
+                        self.cpu_level_released = True
+                        return
+                    if not self.cpu_level_pressed:
+                        if self.verbose:
+                            print("pressing A")
+                        controller.press_button(enums.Button.BUTTON_A)
+                        self.cpu_level_pressed = True
+                        return
+                    else:
+                        if self.verbose:
+                            print("releasing A")
+                        self.cpu_level = level
+                        controller.release_button(enums.Button.BUTTON_A)
+                        return
+                        
         # We are already set, so let's taunt our opponent
         if character_selected == character and swag and not start:
             delta_x = 3 * math.cos(gamestate.frame / 1.5)
