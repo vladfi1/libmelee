@@ -1,4 +1,5 @@
 import gym, melee, sys, signal, time
+from ray.rllib.env import MultiAgentEnv
 from gym import error, spaces, utils
 from gym.utils import seeding
 import numpy as np 
@@ -50,7 +51,7 @@ buttons = [enums.Button.BUTTON_A, enums.Button.BUTTON_B, enums.Button.BUTTON_X, 
 intervals = [(0, 0), (0.5, 0), (0, 0.5), (1, 0), (0, 1), (1, 0.5), (0.5, 1), (1, 1)]
 
 
-class SSBMEnv(gym.Env):
+class SSBMEnv(MultiAgentEnv):
     DOLPHIN_SHUTDOWN_TIME = 5
     metadata = {'render.modes': ['human']}
 
@@ -138,7 +139,7 @@ class SSBMEnv(gym.Env):
 
         observations = [p1_state, p2_state]
         obs_dict = { agent_name : observations[i] for i, agent_name in enumerate(self.agents) }
-
+        
         return obs_dict
 
     def _get_done(self):
@@ -260,6 +261,7 @@ class SSBMEnv(gym.Env):
             self._stop_dolphin()
         
         return state, reward, done, info
+    
 
     def reset(self):    # TODO: should reset state to initial state, how to do this?
         if self._is_dolphin_running:
