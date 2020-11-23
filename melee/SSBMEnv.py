@@ -102,8 +102,32 @@ class SSBMEnv(MultiAgentEnv):
 
     def _default_get_reward(self, prev_gamestate, gamestate): # define reward function
         # TODO: make sure that the correct damage goes to the correct player
-        p1_reward = gamestate.player[self.ctrlr_op_port].percent-gamestate.player[self.ctrlr_port].percent
+
+        p1DamageDealt = gamestate.player[self.ctrlr_op_port].percent - prev_gamestate.player[self.ctrlr_op_port].percent
+        p1DamageTaken = gamestate.player[self.ctrlr_port].percent - prev_gamestate.player[self.ctrlr_port].percent
+        
+        
+        isp1Dead = gamestate.player[self.ctrlr_port].action.value <= 0xa
+        isp2Dead = gamestate.player[self.ctrlr_op_port].action.value <= 0xa
+        
+        wasp1Dead = prev_gamestate.player[self.ctrlr_port].action.value <= 0xa
+        wasp2Dead = prev_gamestate.player[self.ctrlr_op_port].action.value <= 0xa
+
+
+        p1rkill = 200 if isp2Dead and not wasp2Dead else 0 
+        p1rdeath = -200 if isp1Dead and not wasp1Dead else 0
+
+        if p1rkill == 200:
+            print("POG WE KILL")
+        if p1rdeath == -200:
+            print("WE DED")
+
+        p1_reward = p1DamageDealt - p1DamageTaken + p1rkill + p1rdeath
+
         p2_reward = gamestate.player[self.ctrlr_port].percent-gamestate.player[self.ctrlr_op_port].percent
+        
+        
+
         rewards = [p1_reward, p2_reward]
 
         joint_reward = {}
@@ -130,6 +154,7 @@ class SSBMEnv(MultiAgentEnv):
                              float(p2.invulnerable), p2.invulnerability_left, float(p2.hitlag), p2.hitstun_frames_left, p2.jumps_left, 
                              float(p2.on_ground), p2.speed_air_x_self, p2.speed_y_self, p2.speed_x_attack, p2.speed_y_attack, p2.speed_ground_x_self])
         p1, p2 = p2, p1 
+
         p2_state = np.array([p1.character.value, p1.x, p1.y, p1.percent, p1.shield_strength, p1.facing, p1.action.value, p1.action_frame, 
                              float(p1.invulnerable), p1.invulnerability_left, float(p1.hitlag), p1.hitstun_frames_left, p1.jumps_left, 
                              float(p1.on_ground), p1.speed_air_x_self, p1.speed_y_self, p1.speed_x_attack, p1.speed_y_attack, p1.speed_ground_x_self, 
@@ -234,7 +259,7 @@ class SSBMEnv(MultiAgentEnv):
     def step(self, joint_action): # step should advance our state (in the form of the obs space)
         if set(joint_action.keys()).intersection(self.agents) != set(joint_action.keys()).union(self.agents):
             raise ValueError("Invalid agent in action dictionary!")
-
+        
         # why do we need to do this?
         self.ctrlr_port = melee.gamestate.port_detector(self.gamestate, self.char1) 
         self.ctrlr_op_port = melee.gamestate.port_detector(self.gamestate, self.char2)
@@ -256,6 +281,13 @@ class SSBMEnv(MultiAgentEnv):
         # determine if game is over and write extra info
         done = self._get_done()
         info = self._get_info()
+
+        if self.gamestate.menu_state != melee.enums.Menu.IN_GAME:
+            for key, _  in done.items():
+                done[key] = True
+        else:
+            for key, _ in done.items():
+                done[key] = False
 
         if done['__all__']:
             self._stop_dolphin()
