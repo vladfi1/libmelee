@@ -2,14 +2,14 @@ import gym, melee, sys, signal, time
 from ray.rllib.env import MultiAgentEnv
 from gym import error, spaces, utils
 from gym.utils import seeding
-import numpy as np 
+import numpy as np
 from melee import enums
 
 """
 Gym compatible env for libmelee (an RL framework for SSBM)
 
 Attr:
-    - 
+    -
 """
 SLIPPI_ADDRESS = "127.0.0.1"
 SLIPPI_PORT=51441
@@ -45,8 +45,8 @@ Observation space: [p1_char, p1_x, p1_y, p1_percent, p1_shield, p1_facing, p1_ac
                     p1_speed_y_self, p1_speed_x_attack, p1_speed_y_attack, p1_speed_ground_x_self, distance_btw_players, ...p2 same attr...]
 """
 
-buttons = [enums.Button.BUTTON_A, enums.Button.BUTTON_B, enums.Button.BUTTON_X, enums.Button.BUTTON_Y, enums.Button.BUTTON_Z, 
-               enums.Button.BUTTON_L, enums.Button.BUTTON_R, enums.Button.BUTTON_D_UP, enums.Button.BUTTON_D_DOWN, enums.Button.BUTTON_D_LEFT, 
+buttons = [enums.Button.BUTTON_A, enums.Button.BUTTON_B, enums.Button.BUTTON_X, enums.Button.BUTTON_Y, enums.Button.BUTTON_Z,
+               enums.Button.BUTTON_L, enums.Button.BUTTON_R, enums.Button.BUTTON_D_UP, enums.Button.BUTTON_D_DOWN, enums.Button.BUTTON_D_LEFT,
                enums.Button.BUTTON_D_RIGHT]
 intervals = [(0, 0), (0.5, 0), (0, 0.5), (1, 0), (0, 1), (1, 0.5), (0.5, 1), (1, 1)]
 
@@ -55,7 +55,7 @@ class SSBMEnv(MultiAgentEnv):
     DOLPHIN_SHUTDOWN_TIME = 5
     metadata = {'render.modes': ['human']}
 
-    
+
     """
     SSBMEnv Constructor
 
@@ -65,7 +65,7 @@ class SSBMEnv(MultiAgentEnv):
         - self.symmetric: False if one agent is bot
         - self.ctrlr: controller for char1
         - self.ctrlr_op: controller for char2 (could be cpu bot)
-        - 
+        -
 
     Args:
         - dolphin_exe_path: path to dolphin exe
@@ -79,7 +79,7 @@ class SSBMEnv(MultiAgentEnv):
         - reward_func: custom reward function should take two gamestate objects as input and output a tuple
                        containing the reward for the player and opponent
     """
-    def __init__(self, dolphin_exe_path, ssbm_iso_path, char1=melee.Character.FOX, char2=melee.Character.FALCO, 
+    def __init__(self, dolphin_exe_path, ssbm_iso_path, char1=melee.Character.FOX, char2=melee.Character.FALCO,
                 stage=melee.Stage.FINAL_DESTINATION, symmetric=False, cpu_level=1, log=False, reward_func=None, render=False):
         self.dolphin_exe_path = dolphin_exe_path
         self.ssbm_iso_path = ssbm_iso_path
@@ -103,18 +103,17 @@ class SSBMEnv(MultiAgentEnv):
     def _default_get_reward(self, prev_gamestate, gamestate): # define reward function
         # TODO: make sure that the correct damage goes to the correct player
 
-        p1DamageDealt = gamestate.player[self.ctrlr_op_port].percent - prev_gamestate.player[self.ctrlr_op_port].percent
-        p1DamageTaken = gamestate.player[self.ctrlr_port].percent - prev_gamestate.player[self.ctrlr_port].percent
-        
-        
+        p1DamageDealt = max(gamestate.player[self.ctrlr_op_port].percent - prev_gamestate.player[self.ctrlr_op_port].percent, 0)
+        p1DamageTaken = max(gamestate.player[self.ctrlr_port].percent - prev_gamestate.player[self.ctrlr_port].percent, 0)
+
         isp1Dead = gamestate.player[self.ctrlr_port].action.value <= 0xa
         isp2Dead = gamestate.player[self.ctrlr_op_port].action.value <= 0xa
-        
+
         wasp1Dead = prev_gamestate.player[self.ctrlr_port].action.value <= 0xa
         wasp2Dead = prev_gamestate.player[self.ctrlr_op_port].action.value <= 0xa
 
 
-        p1rkill = 200 if isp2Dead and not wasp2Dead else 0 
+        p1rkill = 200 if isp2Dead and not wasp2Dead else 0
         p1rdeath = -200 if isp1Dead and not wasp1Dead else 0
 
         if p1rkill == 200:
@@ -125,21 +124,21 @@ class SSBMEnv(MultiAgentEnv):
         p1_reward = p1DamageDealt - p1DamageTaken + p1rkill + p1rdeath
 
         p2_reward = gamestate.player[self.ctrlr_port].percent-gamestate.player[self.ctrlr_op_port].percent
-        
-        
+
+
 
         rewards = [p1_reward, p2_reward]
 
         joint_reward = {}
         for i, agent in enumerate(self.agents):
             joint_reward[agent] = rewards[i]
-        
+
         return joint_reward
 
 
     def _get_state(self):
         """
-        [p1_char, p1_x, p1_y, p1_percent, p1_shield, p1_facing, p1_action_enum_value, p1_action_frame, p1_invulnerable, 
+        [p1_char, p1_x, p1_y, p1_percent, p1_shield, p1_facing, p1_action_enum_value, p1_action_frame, p1_invulnerable,
          p1_invulnerable_left, p1_hitlag, p1_hitstun_frames_left, p1_jumps_left, p1_on_ground, p1_speed_air_x_self,
          p1_speed_y_self, p1_speed_x_attack, p1_speed_y_attack, p1_speed_ground_x_self, distance_btw_players, ...p2 same attr...]
         """
@@ -147,24 +146,24 @@ class SSBMEnv(MultiAgentEnv):
         # I make the assumption that p1 is *always* a non-cpu and p2 is the cpu, if present
         p1 = self.gamestate.player[self.ctrlr_port]
         p2 = self.gamestate.player[self.ctrlr_op_port]
-        p1_state = np.array([p1.character.value, p1.x, p1.y, p1.percent, p1.shield_strength, p1.facing, p1.action.value, p1.action_frame, 
-                             float(p1.invulnerable), p1.invulnerability_left, float(p1.hitlag), p1.hitstun_frames_left, p1.jumps_left, 
-                             float(p1.on_ground), p1.speed_air_x_self, p1.speed_y_self, p1.speed_x_attack, p1.speed_y_attack, p1.speed_ground_x_self, 
-                             self.gamestate.distance, p2.character.value, p2.x, p2.y, p2.percent, p2.shield_strength, p2.facing, p2.action.value, p2.action_frame, 
-                             float(p2.invulnerable), p2.invulnerability_left, float(p2.hitlag), p2.hitstun_frames_left, p2.jumps_left, 
+        p1_state = np.array([p1.character.value, p1.x, p1.y, p1.percent, p1.shield_strength, p1.facing, p1.action.value, p1.action_frame,
+                             float(p1.invulnerable), p1.invulnerability_left, float(p1.hitlag), p1.hitstun_frames_left, p1.jumps_left,
+                             float(p1.on_ground), p1.speed_air_x_self, p1.speed_y_self, p1.speed_x_attack, p1.speed_y_attack, p1.speed_ground_x_self,
+                             self.gamestate.distance, p2.character.value, p2.x, p2.y, p2.percent, p2.shield_strength, p2.facing, p2.action.value, p2.action_frame,
+                             float(p2.invulnerable), p2.invulnerability_left, float(p2.hitlag), p2.hitstun_frames_left, p2.jumps_left,
                              float(p2.on_ground), p2.speed_air_x_self, p2.speed_y_self, p2.speed_x_attack, p2.speed_y_attack, p2.speed_ground_x_self])
-        p1, p2 = p2, p1 
+        p1, p2 = p2, p1
 
-        p2_state = np.array([p1.character.value, p1.x, p1.y, p1.percent, p1.shield_strength, p1.facing, p1.action.value, p1.action_frame, 
-                             float(p1.invulnerable), p1.invulnerability_left, float(p1.hitlag), p1.hitstun_frames_left, p1.jumps_left, 
-                             float(p1.on_ground), p1.speed_air_x_self, p1.speed_y_self, p1.speed_x_attack, p1.speed_y_attack, p1.speed_ground_x_self, 
-                             self.gamestate.distance, p2.character.value, p2.x, p2.y, p2.percent, p2.shield_strength, p2.facing, p2.action.value, p2.action_frame, 
-                             float(p2.invulnerable), p2.invulnerability_left, float(p2.hitlag), p2.hitstun_frames_left, p2.jumps_left, 
+        p2_state = np.array([p1.character.value, p1.x, p1.y, p1.percent, p1.shield_strength, p1.facing, p1.action.value, p1.action_frame,
+                             float(p1.invulnerable), p1.invulnerability_left, float(p1.hitlag), p1.hitstun_frames_left, p1.jumps_left,
+                             float(p1.on_ground), p1.speed_air_x_self, p1.speed_y_self, p1.speed_x_attack, p1.speed_y_attack, p1.speed_ground_x_self,
+                             self.gamestate.distance, p2.character.value, p2.x, p2.y, p2.percent, p2.shield_strength, p2.facing, p2.action.value, p2.action_frame,
+                             float(p2.invulnerable), p2.invulnerability_left, float(p2.hitlag), p2.hitstun_frames_left, p2.jumps_left,
                              float(p2.on_ground), p2.speed_air_x_self, p2.speed_y_self, p2.speed_x_attack, p2.speed_y_attack, p2.speed_ground_x_self])
 
         observations = [p1_state, p2_state]
         obs_dict = { agent_name : observations[i] for i, agent_name in enumerate(self.agents) }
-        
+
         return obs_dict
 
     def _get_done(self):
@@ -177,7 +176,7 @@ class SSBMEnv(MultiAgentEnv):
         for agent in self.agents:
             info[agent] = {}
         return info
-    
+
     def _perform_action(self, player, action_idx):
         if action_idx == 0:
             return
@@ -227,7 +226,7 @@ class SSBMEnv(MultiAgentEnv):
             print("ERROR: Failed to connect the controller.")
             raise RuntimeError("Failed to connect to controller")
         print("Controllers connected")
-    
+
     def _step_through_menu(self):
         # Step through main menu, player select, stage select scenes # TODO: include frame processing warning stuff
         self.gamestate = self.console.step()
@@ -241,38 +240,38 @@ class SSBMEnv(MultiAgentEnv):
                                         swag=False,
                                         make_cpu=not self.symmetric,
                                         level=self.cpu_level)
-        
+
         while self.gamestate.menu_state not in [melee.Menu.IN_GAME, melee.Menu.SUDDEN_DEATH]:
             self.gamestate = self.console.step()
             menu_helper.step(self.gamestate)
             if self.log:
                 self.logger.logframe(self.gamestate)
                 self.logger.writeframe()
-        
+
     def _stop_dolphin(self):
         print("STOPPING DOLPHIN")
         if self.console:
             self.console.stop()
             time.sleep(self.DOLPHIN_SHUTDOWN_TIME)
         self._is_dolphin_running = False
-    
+
     def step(self, joint_action): # step should advance our state (in the form of the obs space)
         if set(joint_action.keys()).intersection(self.agents) != set(joint_action.keys()).union(self.agents):
             raise ValueError("Invalid agent in action dictionary!")
-        
+
         # why do we need to do this?
-        self.ctrlr_port = melee.gamestate.port_detector(self.gamestate, self.char1) 
+        self.ctrlr_port = melee.gamestate.port_detector(self.gamestate, self.char1)
         self.ctrlr_op_port = melee.gamestate.port_detector(self.gamestate, self.char2)
 
         if self.ctrlr_port != self.ctrlr.port or self.ctrlr_op_port != self.ctrlr_op.port:
             raise RuntimeError("Controller port inconsistency!")
-        
+
         prev_gamestate = self.gamestate
         # perform actions
         for agent_idx, agent in enumerate(self.agents):
             action = joint_action[agent]
             self._perform_action(agent_idx, action)
-        
+
         # step env
         self.gamestate = self.console.step()
         # collect reward
@@ -291,9 +290,9 @@ class SSBMEnv(MultiAgentEnv):
 
         if done['__all__']:
             self._stop_dolphin()
-        
+
         return state, reward, done, info
-    
+
 
     def reset(self):    # TODO: should reset state to initial state, how to do this?
         if self._is_dolphin_running:
@@ -308,20 +307,20 @@ class SSBMEnv(MultiAgentEnv):
         else:
             self.agents = ['ai_1']
 
-        self.ctrlr_port = melee.gamestate.port_detector(self.gamestate, self.char1) 
+        self.ctrlr_port = melee.gamestate.port_detector(self.gamestate, self.char1)
         self.ctrlr_op_port = melee.gamestate.port_detector(self.gamestate, self.char2)
-        
+
         if self.ctrlr_port != self.ctrlr.port or self.ctrlr_op_port != self.ctrlr_op.port:
             raise RuntimeError("Controller port inconsistency!")
-        
+
         # Return initial observation
         joint_obs = self._get_state()
         return joint_obs
 
-    
+
     def render(self, mode='human', close=False):    # FIXME: changing this parameter does nothing rn??
         self.console.render = True
-    
+
 
 if __name__ == "__main__":
     import time
@@ -349,7 +348,7 @@ if __name__ == "__main__":
         if curr_time > 18:
             start_time = time.time()
             ssbm_env.reset()
-        
+
         # Perform first part of upsmash
         joint_action = {'ai_1' : 35}
         if not args.cpu:
