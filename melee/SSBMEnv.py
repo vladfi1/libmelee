@@ -4,6 +4,7 @@ from gym import error, spaces, utils
 from gym.utils import seeding
 import numpy as np
 from melee import enums
+from melee.utils import Timeout
 
 """
 Gym compatible env for libmelee (an RL framework for SSBM)
@@ -82,9 +83,11 @@ class SSBMEnv(MultiAgentEnv):
         - gamma (float): Discount factor
         - shaping_coeff (float): Relative weight of potential reward to sparse reward
         - off_stage_weight (float): Penalty agent receives for being off stage
+        - num_dolpin_retries (int): Number of times we re-try to start dolphin before giving up
+        - dolphin_timeout (int): Number of seconds after which we consider a dolphin startup failed
     """
     def __init__(self, dolphin_exe_path, ssbm_iso_path, char1=melee.Character.FOX, char2=melee.Character.FALCO,
-                stage=melee.Stage.FINAL_DESTINATION, symmetric=False, cpu_level=1, log=False, reward_func=None, kill_reward=200, aggro_coeff=1, gamma=0.99, shaping_coeff=1, off_stage_weight=10, **kwargs):
+                stage=melee.Stage.FINAL_DESTINATION, symmetric=False, cpu_level=1, log=False, reward_func=None, kill_reward=200, aggro_coeff=1, gamma=0.99, shaping_coeff=1, off_stage_weight=10, num_dolphin_retries=3, dolphin_timeout=20, **kwargs):
         self.dolphin_exe_path = dolphin_exe_path
         self.ssbm_iso_path = ssbm_iso_path
         self.char1 = char1
@@ -101,6 +104,8 @@ class SSBMEnv(MultiAgentEnv):
         self.aggro_coeff = aggro_coeff
         self.shaping_coeff = 1
         self.off_stage_weight = 10
+        self.num_dolphin_retries = num_dolphin_retries
+        self.dolphin_timeout = dolphin_timeout
         self._is_dolphin_running = False
 
         self.get_reward = self._default_get_reward if not self.reward_func else self.reward_func
@@ -280,6 +285,26 @@ class SSBMEnv(MultiAgentEnv):
                 self.logger.logframe(self.gamestate)
                 self.logger.writeframe()
 
+    def _start_game(self):
+        self._start_dolphin()
+        self._step_through_menu()
+
+    def start_game(self):
+        if self._is_dolphin_running:
+            self._stop_dolphin()
+        
+        start_game_timeout = Timeout(self._start_game, self.dolphin_timeout)
+
+        for _ in range(self.num_dolphin_retries):
+            success = start_game_timeout()
+            if success:
+                return True
+            print("Failed to start dolphin. Retrying...")
+            self._stop_dolphin()
+        raise RuntimeError("Failed to properly start game!")
+
+
+
     def _stop_dolphin(self):
         print("STOPPING DOLPHIN")
         if self.console:
@@ -327,12 +352,8 @@ class SSBMEnv(MultiAgentEnv):
 
 
     def reset(self):    # TODO: should reset state to initial state, how to do this?
-        if self._is_dolphin_running:
-            self._stop_dolphin()
-
         # hashtag JustDolphinThings
-        self._start_dolphin()
-        self._step_through_menu()
+        self.start_game()
 
         if self.symmetric:
             self.agents = ['ai_1', 'ai_2']
