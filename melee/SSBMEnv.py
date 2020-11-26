@@ -53,7 +53,6 @@ intervals = [(0, 0), (0.5, 0), (0, 0.5), (1, 0), (0, 1), (1, 0.5), (0.5, 1), (1,
 
 class SSBMEnv(MultiAgentEnv):
     DOLPHIN_SHUTDOWN_TIME = 5
-    metadata = {'render.modes': ['human']}
 
 
     """
@@ -78,9 +77,14 @@ class SSBMEnv(MultiAgentEnv):
         - log: are we logging stuff?
         - reward_func: custom reward function should take two gamestate objects as input and output a tuple
                        containing the reward for the player and opponent
+        - kill_reward: (int) Reward an agents gets (loses) for each kill (death) in default reward function
+        - aggro_coeff: (float): Relative weight of damage given to damage taken in potential function. >1 encourages more aggressive agents
+        - gamma (float): Discount factor
+        - shaping_coeff (float): Relative weight of potential reward to sparse reward
+        - off_stage_weight (float): Penalty agent receives for being off stage
     """
     def __init__(self, dolphin_exe_path, ssbm_iso_path, char1=melee.Character.FOX, char2=melee.Character.FALCO,
-                stage=melee.Stage.FINAL_DESTINATION, symmetric=False, cpu_level=1, log=False, reward_func=None, render=False):
+                stage=melee.Stage.FINAL_DESTINATION, symmetric=False, cpu_level=1, log=False, reward_func=None, kill_reward=200, aggro_coeff=1, gamma=0.99, shaping_coeff=1, off_stage_weight=10, **kwargs):
         self.dolphin_exe_path = dolphin_exe_path
         self.ssbm_iso_path = ssbm_iso_path
         self.char1 = char1
@@ -89,10 +93,14 @@ class SSBMEnv(MultiAgentEnv):
         self.symmetric = symmetric
         self.cpu_level = cpu_level
         self.reward_func = reward_func
-        self.render = render
         self.logger = melee.Logger()
         self.log = log
         self.console = None
+        self.gamma = gamma
+        self.kill_reward = kill_reward
+        self.aggro_coeff = aggro_coeff
+        self.shaping_coeff = 1
+        self.off_stage_weight = 10
         self._is_dolphin_running = False
 
         self.get_reward = self._default_get_reward if not self.reward_func else self.reward_func
@@ -101,8 +109,17 @@ class SSBMEnv(MultiAgentEnv):
         self.action_space = spaces.Discrete(self.num_actions+1) # plus one for nop
 
     def _default_get_reward(self, prev_gamestate, gamestate): # define reward function
-        # TODO: make sure that the correct damage goes to the correct player
+        sparse_reward = self._get_sparse_reward(prev_gamestate, gamestate)
+        potential_reward = self._get_potential_reward(prev_gamestate, gamestate)
 
+        joint_shaped_reward = {}
+        for i, agent in enumerate(self.agents):
+            joint_shaped_reward[agent] = sparse_reward[agent] + self.shaping_coeff * potential_reward[agent]
+
+        return joint_shaped_reward
+
+    def _get_sparse_reward(self, prev_gamestate, gamestate):
+        # TODO: make sure that the correct damage goes to the correct player
         p1DamageDealt = max(gamestate.player[self.ctrlr_op_port].percent - prev_gamestate.player[self.ctrlr_op_port].percent, 0)
         p1DamageTaken = max(gamestate.player[self.ctrlr_port].percent - prev_gamestate.player[self.ctrlr_port].percent, 0)
 
@@ -113,19 +130,11 @@ class SSBMEnv(MultiAgentEnv):
         wasp2Dead = prev_gamestate.player[self.ctrlr_op_port].action.value <= 0xa
 
 
-        p1rkill = 200 if isp2Dead and not wasp2Dead else 0
-        p1rdeath = -200 if isp1Dead and not wasp1Dead else 0
+        p1rkill = isp2Dead and not wasp2Dead 
+        p1rdeath = isp1Dead and not wasp1Dead
 
-        if p1rkill == 200:
-            print("POG WE KILL")
-        if p1rdeath == -200:
-            print("WE DED")
-
-        p1_reward = p1DamageDealt - p1DamageTaken + p1rkill + p1rdeath
-
-        p2_reward = gamestate.player[self.ctrlr_port].percent-gamestate.player[self.ctrlr_op_port].percent
-
-
+        p1_reward = self.aggro_coeff * p1DamageDealt - p1DamageTaken + p1rkill * self.kill_reward - p1rdeath * self.kill_reward
+        p2_reward = self.aggro_coeff * p1DamageTaken - p1DamageDealt + p1rdeath * self.kill_reward - p1rkill * self.kill_reward
 
         rewards = [p1_reward, p2_reward]
 
@@ -135,6 +144,30 @@ class SSBMEnv(MultiAgentEnv):
 
         return joint_reward
 
+
+
+    def _potential(self, gamestate):
+        p1_off_stage = -1 * int(gamestate.player[self.ctrlr_port].off_stage) * self.off_stage_weight
+        p2_off_stage = -1 * int(gamestate.player[self.ctrlr_op_port].off_stage) * self.off_stage_weight
+
+        potentials = [p1_off_stage, p2_off_stage]
+
+        joint_potential = {}
+        for i, agent in enumerate(self.agents):
+            joint_potential[agent] = potentials[i]
+
+        return joint_potential
+
+    def _get_potential_reward(self, s, s_prime):
+        phi_s = self._potential(s)
+        phi_s_prime = self._potential(s_prime)
+
+        joint_potential_reward = {}
+
+        for i, agent in enumerate(self.agents):
+            joint_potential_reward[agent] = self.gamma * phi_s_prime[agent] - phi_s[agent]
+
+        return joint_potential_reward
 
     def _get_state(self):
         """
@@ -202,7 +235,6 @@ class SSBMEnv(MultiAgentEnv):
                                     blocking_input=False,
                                     polling_mode=False,
                                     logger=self.logger)
-        self.console.render = self.render
         self.symmetric = self.symmetric
         self.ctrlr = melee.Controller(console=self.console,
                                     port=PLAYER_PORT,
@@ -318,10 +350,6 @@ class SSBMEnv(MultiAgentEnv):
         return joint_obs
 
 
-    def render(self, mode='human', close=False):    # FIXME: changing this parameter does nothing rn??
-        self.console.render = True
-
-
 if __name__ == "__main__":
     import time
     import argparse
@@ -337,24 +365,20 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    ssbm_env = SSBMEnv(args.dolphin_executable_path, args.iso_path, symmetric=not args.cpu, cpu_level=args.cpu_level, log=True, render=True)
+    ssbm_env = SSBMEnv(args.dolphin_executable_path, args.iso_path, symmetric=not args.cpu, cpu_level=args.cpu_level, log=True)
     obs = ssbm_env.reset()
 
     start_time = time.time()
     done = False
     while not done:
-        curr_time = time.time() - start_time
-        print(">>>>>", curr_time)
-        if curr_time > 18:
-            start_time = time.time()
-            ssbm_env.reset()
-
         # Perform first part of upsmash
         joint_action = {'ai_1' : 35}
         if not args.cpu:
             joint_action['ai_2'] = 0
         obs, reward, done, info = ssbm_env.step(joint_action)
         done = done['__all__']
+
+        print(reward)
 
         # Perform second part of upsmash
         if not done:
@@ -363,3 +387,5 @@ if __name__ == "__main__":
                 joint_action['ai_2'] = 0
             obs, reward, done, info = ssbm_env.step(joint_action)
             done = done['__all__']
+
+        print(reward)
