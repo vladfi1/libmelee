@@ -90,6 +90,8 @@ class Console:
                  disable_audio=False,
                  overclock: Optional[float] = None,
                  save_replays=True,
+                 use_exi_inputs=False,
+                 enable_ffw=False,
                 ):
         """Create a Console object
 
@@ -121,6 +123,11 @@ class Console:
             disable_audio (bool): Turn off sound.
             overclock (bool): Overclock the dolphin CPU.
             save_replays (bool): Save slippi replays.
+            use_exi_inputs (bool): Enable gecko code for exi dolphin inputs. Use with the
+                https://github.com/altf4/Ishiiruka/tree/feature/ai-inputs-exi-pr
+                dolphin branch.
+            enable_ffw (bool): Enable fast-forward mode. Useful for bot training. Must
+                have use_exi_inputs=True.
         """
         self.logger = logger
         self.is_dolphin = is_dolphin
@@ -169,6 +176,10 @@ class Console:
         self.disable_audio = disable_audio
         self.overclock = overclock
         self.save_replays = save_replays
+        self.use_exi_inputs = use_exi_inputs
+        if enable_ffw and not use_exi_inputs:
+            raise ValueError("Must use exi inputs to enable ffw mode.")
+        self.enable_ffw = enable_ffw
 
         # Keep a running copy of the last gamestate produced
         self._prev_gamestate = GameState()
@@ -337,13 +348,28 @@ class Console:
             config.write(dolphinfile)
 
     def _setup_gecko_codes(self):
+        ini_name = "GALE01r2.ini"
+
         game_settings_path = os.path.join(self._get_dolphin_home_path(), 'GameSettings')
         os.makedirs(game_settings_path, exist_ok=True)
+        dst_ini_path = os.path.join(game_settings_path, ini_name)
 
         libmelee_path = os.path.dirname(os.path.realpath(__file__))
-        gale01r2_ini_path = os.path.join(libmelee_path, "GALE01r2.ini")
+        src_ini_path = os.path.join(libmelee_path, ini_name)
+        with open(src_ini_path) as f:
+            ini_text = f.read()
 
-        shutil.copy(gale01r2_ini_path, game_settings_path)
+        extra_codes = []
+        if self.use_exi_inputs:
+            extra_codes.append("$Optional: Allow Bot Input Overrides")
+        if self.enable_ffw:
+            extra_codes.append("$Optional: FFW VS Mode")
+
+        extra_codes = "\n".join(extra_codes)
+        ini_text = ini_text.format(extra_codes=extra_codes)
+
+        with open(dst_ini_path, "w") as f:
+            f.write(ini_text)
 
     def setup_dolphin_controller(self, port, controllertype=enums.ControllerType.STANDARD):
         """Setup the necessary files for dolphin to recognize the player at the given
