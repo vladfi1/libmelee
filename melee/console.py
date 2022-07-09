@@ -302,6 +302,12 @@ class Console:
             # If dolphin, kill the process
             if self._process is not None:
                 self._process.terminate()
+                try:
+                    self._process.wait(1)
+                except subprocess.TimeoutExpired:
+                    # this seems to be necessary, maybe due to blocking inputs?
+                    self._process.kill()
+                    self._process.wait()
                 self._process = None
 
         if self.temp_dir:
