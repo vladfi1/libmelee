@@ -72,12 +72,14 @@ class SlippstreamWorker:
             logging.error(e)
             return False
         try:
-            for _ in range(4):
+            for _ in range(10):
                 event = self._host.service(1000)
                 if event.type == enet.EVENT_TYPE_CONNECT:
                     self._send_handshake()
                     return True
-            logging.error('Could not receive CONNECT event.')
+            logging.error(
+                'Could not receive CONNECT event at address '
+                f'{self.address}:{self.port}.')
             return False
         except OSError:
             logging.error(e)
