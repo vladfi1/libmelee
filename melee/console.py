@@ -90,6 +90,7 @@ class Console:
                  disable_audio=False,
                  overclock: Optional[float] = None,
                  save_replays=True,
+                 replay_dir=None,
                  use_exi_inputs=False,
                  enable_ffw=False,
                 ):
@@ -123,6 +124,7 @@ class Console:
             disable_audio (bool): Turn off sound.
             overclock (bool): Overclock the dolphin CPU.
             save_replays (bool): Save slippi replays.
+            replay_dir (str): Directory to save replays to. Defaults to "~/Slippi".
             use_exi_inputs (bool): Enable gecko code for exi dolphin inputs. Use with the
                 https://github.com/altf4/Ishiiruka/tree/feature/ai-inputs-exi-pr
                 dolphin branch.
@@ -176,6 +178,7 @@ class Console:
         self.disable_audio = disable_audio
         self.overclock = overclock
         self.save_replays = save_replays
+        self.replay_dir = replay_dir
         self.use_exi_inputs = use_exi_inputs
         if enable_ffw and not use_exi_inputs:
             raise ValueError("Must use exi inputs to enable ffw mode.")
@@ -344,6 +347,8 @@ class Console:
             config.set("Core", "OverclockEnable", "True")
 
         config.set("Core", "SlippiSaveReplays", str(self.save_replays))
+        if self.replay_dir:
+            config.set("Core", "SlippiReplayDir", self.replay_dir)
 
         with open(dolphin_ini_path, 'w') as dolphinfile:
             config.write(dolphinfile)
