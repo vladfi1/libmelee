@@ -125,9 +125,12 @@ class Console:
             overclock (bool): Overclock the dolphin CPU.
             save_replays (bool): Save slippi replays.
             replay_dir (str): Directory to save replays to. Defaults to "~/Slippi".
-            use_exi_inputs (bool): Enable gecko code for exi dolphin inputs. Use with the
+            use_exi_inputs (bool): Enable gecko code for exi dolphin inputs. This is
+                necessary for fast-forward mode which ignores dolphin's normal polling.
+                Must be used with a compatible Ishiiruka branch such as
                 https://github.com/altf4/Ishiiruka/tree/feature/ai-inputs-exi-pr
-                dolphin branch.
+                or https://github.com/vladfi1/slippi-Ishiiruka/tree/exi-ai. Note that
+                this will likely be incompatible with netplay.
             enable_ffw (bool): Enable fast-forward mode. Useful for bot training. Must
                 have use_exi_inputs=True.
         """
