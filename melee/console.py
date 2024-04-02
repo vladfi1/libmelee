@@ -91,6 +91,7 @@ class Console:
                  overclock: Optional[float] = None,
                  save_replays=True,
                  replay_dir=None,
+                 log_level: int = 3,  # WARN, see Source/Core/Common/Logging/Log.h
                  use_exi_inputs=False,
                  enable_ffw=False,
                 ):
@@ -125,6 +126,7 @@ class Console:
             overclock (bool): Overclock the dolphin CPU.
             save_replays (bool): Save slippi replays.
             replay_dir (str): Directory to save replays to. Defaults to "~/Slippi".
+            log_level (int): Dolphin log level.
             use_exi_inputs (bool): Enable gecko code for exi dolphin inputs. This is
                 necessary for fast-forward mode which ignores dolphin's normal polling.
                 Must be used with a compatible Ishiiruka branch such as
@@ -181,6 +183,7 @@ class Console:
         self.overclock = overclock
         self.save_replays = save_replays
         self.replay_dir = replay_dir
+        self.log_level = log_level
         self.use_exi_inputs = use_exi_inputs
         if enable_ffw and not use_exi_inputs:
             raise ValueError("Must use exi inputs to enable ffw mode.")
@@ -354,6 +357,25 @@ class Console:
 
         with open(dolphin_ini_path, 'w') as dolphinfile:
             config.write(dolphinfile)
+
+        # Set up logger config
+        logger_ini_path = os.path.join(config_path, "Logger.ini")
+        logger_config = configparser.ConfigParser()
+        if os.path.isfile(logger_ini_path):
+            logger_config.read(logger_ini_path)
+
+        for section in ['Options', 'Logs']:
+            if not logger_config.has_section(section):
+                logger_config.add_section(section)
+
+        logger_config.set("Options", "WriteToFile", "True")
+        logger_config.set("Options", "Verbosity", str(self.log_level))
+
+        for log_type in ['SLIPPI']:
+            logger_config.set("Logs", log_type, "True")
+
+        with open(logger_ini_path, 'w') as f:
+            logger_config.write(f)
 
     def _setup_gecko_codes(self):
         ini_name = "GALE01r2.ini"
