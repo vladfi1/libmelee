@@ -309,6 +309,7 @@ class Console:
             self._slippstream.shutdown()
             # If dolphin, kill the process
             if self._process is not None:
+                # Sadly dolphin doesn't respect terminate
                 self._process.kill()
                 self._process.wait()
                 self._process = None
