@@ -254,7 +254,31 @@ class Console:
             os.makedirs(pipes_path, exist_ok=True)
         return pipes_path + f"slippibot{port}"
 
-    def run(self, iso_path=None, dolphin_user_path=None, environment_vars=None, exe_name=None):
+    def _get_exe_path(self, exe_name: Optional[str] = None) -> str:
+        """Return the path to the dolphin executable"""
+        if os.path.isfile(self.path):
+            return self.path
+
+        exe_path = [self.path]
+        if platform.system() == "Darwin":
+            exe_path.append("Contents/MacOS")
+
+        if not exe_name:
+          if platform.system() == "Windows":
+              exe_name = "Slippi Dolphin.exe"
+          elif platform.system() == "Darwin":
+              exe_name = "Slippi Dolphin"
+          else: # Linux
+              exe_name = "dolphin-emu"
+
+        return os.path.join(*exe_path, exe_name)
+
+    def run(self,
+            iso_path: Optional[str] = None,
+            dolphin_user_path: Optional[str] = None,
+            environment_vars: Optional[str] = None,
+            exe_name: Optional[str] = None,
+            ):
         """Run the Dolphin emulator.
 
         This starts the Dolphin process, so don't run this if you're connecting to an
@@ -269,33 +293,21 @@ class Console:
         """
         assert self.is_dolphin and self.path
 
-        dolphin_user_path = dolphin_user_path or self._get_dolphin_home_path()
-
-        exe_name = exe_name or "dolphin-emu"
-        if platform.system() == "Windows":
-            exe_name = "Slippi Dolphin.exe"
-        elif platform.system() == "Darwin":
-            exe_name = "Slippi Dolphin"
-
-        exe_path = ""
-        if self.path:
-            exe_path = self.path
-        if platform.system() == "Darwin":
-            exe_path += "/Contents/MacOS"
-        command = [exe_path + "/" + exe_name]
-
-        # AppImage
-        if platform.system() == "Linux" and os.path.isfile(self.path):
-            command = [self.path]
+        exe_path = self._get_exe_path(exe_name)
+        command = [exe_path]
 
         if iso_path is not None:
             command.append("-e")
             command.append(iso_path)
+
+        dolphin_user_path = dolphin_user_path or self._get_dolphin_home_path()
         command.append("-u")
         command.append(dolphin_user_path)
+
         env = os.environ.copy()
         if environment_vars is not None:
             env.update(environment_vars)
+
         self._process = subprocess.Popen(command, env=env)
 
     def stop(self):
