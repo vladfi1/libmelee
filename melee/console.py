@@ -655,6 +655,18 @@ class Console:
         c_y = (np.ndarray((1,), ">f", event_bytes, 0x25)[0] / 2) + 0.5
         playerstate.controller_state.c_stick = (c_x, c_y)
 
+        raw_main_x = 0  # Added in 1.2.0
+        raw_main_y = 0  # Added in 3.15.0
+        try:
+            raw_main_x = int(np.ndarray((1,), ">b", event_bytes, 0x3B)[0])
+        except TypeError:
+            pass
+        try:
+            raw_main_y = int(np.ndarray((1,), ">b", event_bytes, 0x40)[0])
+        except TypeError:
+            pass
+        playerstate.controller_state.raw_main_stick = (raw_main_x, raw_main_y)
+
         # The game interprets both shoulders together, so the processed value will always be the same
         trigger = (np.ndarray((1,), ">f", event_bytes, 0x29)[0])
         playerstate.controller_state.l_shoulder = trigger

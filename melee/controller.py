@@ -37,6 +37,8 @@ class ControllerState:
         """(pair of floats): The main stick's x,y position. Ranges from 0->1, 0.5 is neutral"""
         self.c_stick = (.5, .5)
         """(pair of floats): The C stick's x,y position. Ranges from 0->1, 0.5 is neutral"""
+        self.raw_main_stick = (0, 0)
+        """(pair of ints): The raw unprocessed main stick coordinates. Ranges from -128 -> 127. 0 is neutral."""
         #Analog shoulders
         self.l_shoulder = 0
         """(float): L shoulder analog press. Ranges from 0 (not pressed) to 1 (fully pressed)"""

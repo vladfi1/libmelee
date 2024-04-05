@@ -149,7 +149,7 @@ class PlayerState(object):
         self.iasa = 0
         self.moonwalkwarning = False
         """(bool): Helper variable to tell you that if you dash back right now, it'll moon walk"""
-        self.controller_state = melee.controller.ControllerState()
+        self.controller_state = melee.ControllerState()
         """(controller.ControllerState): What buttons were pressed for this character"""
         self.ecb = ECB()
         self.ecb_right = (0, 0)
