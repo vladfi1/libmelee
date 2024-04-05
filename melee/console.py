@@ -97,6 +97,7 @@ class Console:
                  gfx_backend="",
                  disable_audio=False,
                  overclock: Optional[float] = None,
+                 emulation_speed: float = 1.0,
                  save_replays=True,
                  replay_dir=None,
                  user_json_path: Optional[str] = None,
@@ -135,6 +136,8 @@ class Console:
             disable_audio (bool): Turn off sound.
             overclock (bool): Overclock the dolphin CPU. I haven't seen any benefit to
                 this in my experiments.
+            emulation_speed (float): Speed the game runs at. Set to 0 for unlimited speed.
+                Only works with mainline dolphin, Ishiiruka ignores this option.
             save_replays (bool): Save slippi replays.
             replay_dir (str): Directory to save replays to. Defaults to "~/Slippi".
             log_level (int): Dolphin log level.
@@ -196,6 +199,7 @@ class Console:
         self.gfx_backend = gfx_backend
         self.disable_audio = disable_audio
         self.overclock = overclock
+        self.emulation_speed = emulation_speed
         self.save_replays = save_replays
         self.replay_dir = replay_dir
         self.user_json_path = user_json_path
@@ -295,6 +299,7 @@ class Console:
             dolphin_user_path: Optional[str] = None,
             environment_vars: Optional[dict] = None,
             exe_name: Optional[str] = None,
+            platform: Optional[str] = None,
             ):
         """Run the Dolphin emulator.
 
@@ -307,6 +312,10 @@ class Console:
                 if not using the default
             environment_vars (dict, optional): Dict (string->string) of environment variables to set
             exe_name (str, optional): Name of the dolphin executable.
+            platform (str, optional): Set to "headless" to run dolphin in
+              headless mode. Default is typically gui, depending on how
+              dolphin was built. Only applies to mainline dolphin; Ishiiruka
+              bakes the platform into the executable at compilation time.
         """
         assert self.is_dolphin and self.path
 
@@ -320,6 +329,10 @@ class Console:
         dolphin_user_path = dolphin_user_path or self._get_dolphin_home_path()
         command.append("-u")
         command.append(dolphin_user_path)
+
+        if platform is not None:
+            command.append("--platform")
+            command.append(platform)
 
         env = os.environ.copy()
         if environment_vars is not None:
@@ -388,6 +401,8 @@ class Console:
         if self.overclock:
             config.set("Core", "Overclock", str(self.overclock))
             config.set("Core", "OverclockEnable", "True")
+
+        config.set("Core", "EmulationSpeed", str(self.emulation_speed))
 
         config.set("Core", "SlippiSaveReplays", str(self.save_replays))
         if self.replay_dir:
