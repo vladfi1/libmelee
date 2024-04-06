@@ -10,7 +10,18 @@ try:
 except ImportError:
     pass
 
+from melee.console import Console
 from melee import enums
+
+def fix_analog_stick(x: float) -> float:
+    """Fixes the analog stick values to match Console.step output."""
+    # The formula for observed raw values is raw = floor[(x - 0.5) * 254]
+    # Here we invert this, assuming the `x` is a raw value scaled to [0, 1]
+    # which is what Console.step outputs.
+
+    raw = round((x - 0.5) * 160)  # Desired raw value in [-80, 80]
+    fudged = raw + 0.1  # Go slightly above the threshold to avoid rounding issues
+    return (fudged / (127 * 2)) + 0.5  # Desired input value in [0, 1]
 
 class ControllerState:
     """A snapshot of the state of a virtual controller"""
@@ -63,13 +74,23 @@ class Controller:
     buttons programatically, but also automatically configuring the controller with dolphin
     """
 
-    def __init__(self, console, port, type=enums.ControllerType.STANDARD):
+    def __init__(
+            self,
+            console: Console,
+            port: int,
+            type: enums.ControllerType = enums.ControllerType.STANDARD,
+            fix_analog_sticks: bool = True,
+            ):
         """Create a new virtual controller
 
         Args:
             console (console.Console): A console object to attach the controller to
             port (int): Which controller port to plug into. Must be 1-4.
             type (enums.ControllerType): The type of controller this is
+            fix_analog_sticks (bool): If True, analog stick values will be remapped
+              to the [-80, 80] range that melee uses internally. This will ensure
+              that the stick values from Console.step are consistent with the values
+              you send as inputs, modulo the deadzone or sticks with magnitude > 80.
         """
         self._is_dolphin = console.is_dolphin
         if self._is_dolphin:
@@ -82,6 +103,7 @@ class Controller:
         self.logger = console.logger
         self._console = console
         self._type = type
+        self._fix_analog_sticks = fix_analog_sticks
 
         # Configure our controller with the console
         self._console.setup_dolphin_controller(port, type)
@@ -203,7 +225,7 @@ class Controller:
                 self.logger.log("Buttons Pressed", command, concat=True)
             self._write(command)
 
-    def press_shoulder(self, button, amount):
+    def press_shoulder(self, button: enums.Button, amount: float):
         """Press the analog shoulder buttons to a given amount
 
         Args:
@@ -227,7 +249,7 @@ class Controller:
                 self.logger.log("Buttons Pressed", command, concat=True)
             self._write(command)
 
-    def tilt_analog(self, button, x, y):
+    def tilt_analog(self, button: enums.Button, x: float, y: float):
         """ Tilt one of the analog sticks to a given (x,y) value
 
         Args:
@@ -235,10 +257,17 @@ class Controller:
             x (float): Ranges between 0 (left) and 1 (right)
             y (float): Ranges between 0 (down) and 1 (up)
         """
+        if self._fix_analog_sticks:
+            x = fix_analog_stick(x)
+            y = fix_analog_stick(y)
+
         if button == enums.Button.BUTTON_MAIN:
             self.current.main_stick = (x, y)
-        else:
+        elif button == enums.Button.BUTTON_C:
             self.current.c_stick = (x, y)
+        else:
+            raise ValueError(f"Invalid button type {button} for tilt_analog.")
+
         if self._is_dolphin:
             if not self.pipe:
                 return
@@ -248,27 +277,18 @@ class Controller:
             self._write(command)
 
     def tilt_analog_unit(self, button, x, y):
-        """ Tilt one of the analog sticks to a given (x,y) value, normalized to a unit vector
+        """Tilt one of the analog sticks to a given (x,y) value.
 
-        This mean the values range from -1 -> 1 (with 0 center) rather than 0 -> 1 (with 0.5 center)
-        This doesn't press the stick any further than the tilt_analog(), it's just a compat helper
+        Values range from -1 -> 1 (with 0 center) rather than 0 -> 1 (with 0.5 center)
+        This doesn't press the stick any further than the tilt_analog(),
+        it's just a compat helper.
 
         Args:
             button (enums.Button): Must be main stick or C stick
             x (float): Ranges between -1 (left) and 1 (right)
             y (float): Ranges between -1 (down) and 1 (up)
         """
-        if button == enums.Button.BUTTON_MAIN:
-            self.current.main_stick = (x, y)
-        else:
-            self.current.c_stick = (x, y)
-        if self._is_dolphin:
-            if not self.pipe:
-                return
-            command = "SET " + str(button.value) + " " + str((x/2) + 0.5) + " " + str((y/2) + 0.5) + "\n"
-            if self.logger:
-                self.logger.log("Buttons Pressed", command, concat=True)
-            self._write(command)
+        self.tilt_analog(button, (x + 1) / 2, (y + 1) / 2)
 
     # Left around for compat reasons. Might disappear at any time
     #   left undocumented. Just use release_all()
