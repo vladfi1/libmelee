@@ -123,7 +123,8 @@ class Console:
             fullscreen (bool): Run melee fullscreen.
             gfx_backend (str): Graphics backend. Leave blank to use default.
             disable_audio (bool): Turn off sound.
-            overclock (bool): Overclock the dolphin CPU.
+            overclock (bool): Overclock the dolphin CPU. I haven't seen any benefit to
+                this in my experiments.
             save_replays (bool): Save slippi replays.
             replay_dir (str): Directory to save replays to. Defaults to "~/Slippi".
             log_level (int): Dolphin log level.
