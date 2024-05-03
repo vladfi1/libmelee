@@ -7,7 +7,7 @@ This is a fork of [libmelee](https://github.com/altf4/libmelee) geared toward ma
 * A separate process is used to keep the enet connection to dolphin alive. Otherwise, it will time out after one minute of inactivity.
 * Sets up gecko codes for exi-inputs/fast-forward mode, which allows the game to run much faster than normal. These codes internally disable melee's rendering in the same way that is used to fast-forward a replay during playback. A custom dolphin build is required for this.
 * Fixes input stick values to match what the game outputs. This makes imitation-trained bots behave correctly. See this [commit](https://github.com/vladfi1/libmelee/commit/06d5709fae0c5111932408f54ae88f386502e3f2) for details.
-* Various other miscellaneous improvements, such as being able to control dolphin's debug logging.
+* Various other miscellaneous improvements, such as being able to control dolphin's debug logging and setting infinite time mode.
 
 ## Installing Libmelee
 To install this fork, either clone it and install locally, or run

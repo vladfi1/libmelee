@@ -92,6 +92,7 @@ class Console:
                  save_replays=True,
                  replay_dir=None,
                  log_level: int = 3,  # WARN, see Source/Core/Common/Logging/Log.h
+                 infinite_time: bool = False,
                  use_exi_inputs=False,
                  enable_ffw=False,
                 ):
@@ -128,6 +129,7 @@ class Console:
             save_replays (bool): Save slippi replays.
             replay_dir (str): Directory to save replays to. Defaults to "~/Slippi".
             log_level (int): Dolphin log level.
+            infinite_time (bool): Set the game to infinite time mode.
             use_exi_inputs (bool): Enable gecko code for exi dolphin inputs. This is
                 necessary for fast-forward mode which ignores dolphin's normal polling.
                 Must be used with a compatible Ishiiruka branch such as
@@ -185,6 +187,7 @@ class Console:
         self.save_replays = save_replays
         self.replay_dir = replay_dir
         self.log_level = log_level
+        self.infinite_time = infinite_time
         self.use_exi_inputs = use_exi_inputs
         if enable_ffw and not use_exi_inputs:
             raise ValueError("Must use exi inputs to enable ffw mode.")
@@ -404,6 +407,8 @@ class Console:
             ini_text = f.read()
 
         extra_codes = []
+        if self.infinite_time:
+            extra_codes.append("$Optional: Infinite Time Mode")
         if self.use_exi_inputs:
             extra_codes.append("$Optional: Allow Bot Input Overrides")
         if self.enable_ffw:
