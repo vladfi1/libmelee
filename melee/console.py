@@ -246,7 +246,7 @@ class Console:
 
     def _get_dolphin_config_path(self):
         """ Return the path to dolphin's config directory."""
-        return self._get_dolphin_home_path() + "Config/"
+        return os.path.join(self._get_dolphin_home_path(), "Config")
 
     def get_dolphin_pipes_path(self, port):
         """Get the path of the named pipe input file for the given controller port
@@ -280,7 +280,7 @@ class Console:
     def run(self,
             iso_path: Optional[str] = None,
             dolphin_user_path: Optional[str] = None,
-            environment_vars: Optional[str] = None,
+            environment_vars: Optional[dict] = None,
             exe_name: Optional[str] = None,
             ):
         """Run the Dolphin emulator.
@@ -430,7 +430,7 @@ class Console:
                 os.mkfifo(pipes_path)
 
         #Read in dolphin's controller config file
-        controller_config_path = self._get_dolphin_config_path() + "GCPadNew.ini"
+        controller_config_path = os.path.join(self._get_dolphin_config_path(), "GCPadNew.ini")
         config = configparser.ConfigParser()
         config.read(controller_config_path)
 
@@ -479,7 +479,7 @@ class Console:
         with open(controller_config_path, 'w') as configfile:
             config.write(configfile)
 
-        dolphin_config_path = self._get_dolphin_config_path() + "Dolphin.ini"
+        dolphin_config_path = os.path.join(self._get_dolphin_config_path(), "Dolphin.ini")
         config = configparser.ConfigParser()
         config.read(dolphin_config_path)
         # Indexed at 0. "6" means standard controller, "12" means GCN Adapter
