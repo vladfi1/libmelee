@@ -66,6 +66,14 @@ def _default_home_path(path: str) -> str:
 
     raise FileNotFoundError("Could not find dolphin home directory.")
 
+def read_byte(event_bytes: bytes, offset: int):
+    return np.ndarray((1,), ">B", event_bytes, offset)[0]
+
+def read_shift_jis(event_bytes: bytes, offset: int):
+    end = offset
+    while event_bytes[end] != 0:
+        end += 1
+    return event_bytes[offset:end].decode('shift-jis')
 
 # pylint: disable=too-many-instance-attributes
 class Console:
@@ -91,6 +99,7 @@ class Console:
                  overclock: Optional[float] = None,
                  save_replays=True,
                  replay_dir=None,
+                 user_json_path: Optional[str] = None,
                  log_level: int = 3,  # WARN, see Source/Core/Common/Logging/Log.h
                  infinite_time: bool = False,
                  use_exi_inputs=False,
@@ -164,7 +173,8 @@ class Console:
         self.version = ""
         """(str): The Slippi version of the console"""
         self.cursor = 0
-        self.controllers = []
+        from melee.controller import Controller  # avoid circular import
+        self.controllers: list[Controller] = []
         self._current_stage = enums.Stage.NO_STAGE
         self._frame = 0
         self._polling_mode = polling_mode
@@ -176,6 +186,8 @@ class Console:
         self._cpu_level = {0:0, 1:0, 2:0, 3:0}
         self._team_id = {0:0, 1:0, 2:0, 3:0}
         self._is_teams = False
+        self._display_names: dict[int, str] = {}
+        self._connect_codes: dict[int, str] = {}
 
         self.setup_gecko_codes = setup_gecko_codes
         self.online_delay = online_delay
@@ -186,6 +198,7 @@ class Console:
         self.overclock = overclock
         self.save_replays = save_replays
         self.replay_dir = replay_dir
+        self.user_json_path = user_json_path
         self.log_level = log_level
         self.infinite_time = infinite_time
         self.use_exi_inputs = use_exi_inputs
@@ -336,6 +349,14 @@ class Console:
 
     def _setup_home_directory(self,):
         self._setup_dolphin_ini()
+
+        if self.user_json_path:
+          home_path = self._get_dolphin_home_path()
+          slippi_path = os.path.join(home_path, 'Slippi')
+          os.makedirs(slippi_path, exist_ok=True)
+          user_json_path = os.path.join(slippi_path, 'user.json')
+          shutil.copyfile(self.user_json_path, user_json_path)
+
         if self.setup_gecko_codes:
             self._setup_gecko_codes()
 
@@ -547,11 +568,18 @@ class Console:
             except KeyError:
                 pass
 
+        for port, player in gamestate.players.items():
+          i = port - 1
+          if i in self._display_names:
+            player.displayName = self._display_names[i]
+          if i in self._connect_codes:
+            player.connectCode = self._connect_codes[i]
+
         # Start the processing timer now that we're done reading messages
         self._frametimestamp = time.time()
         return gamestate
 
-    def __handle_slippstream_events(self, event_bytes, gamestate):
+    def __handle_slippstream_events(self, event_bytes, gamestate: GameState):
         """ Handle a series of events, provided sequentially in a byte array """
         gamestate.menu_state = enums.Menu.IN_GAME
         while len(event_bytes) > 0:
@@ -619,7 +647,7 @@ class Console:
                 return False
         return False
 
-    def __game_start(self, gamestate, event_bytes):
+    def __game_start(self, gamestate: GameState, event_bytes: bytes):
         self._frame = -10000
         major = np.ndarray((1,), ">B", event_bytes, 0x1)[0]
         minor = np.ndarray((1,), ">B", event_bytes, 0x2)[0]
@@ -648,7 +676,21 @@ class Console:
             if np.ndarray((1,), ">B", event_bytes, 0x66 + (0x24 * i))[0] != 1:
                 self._cpu_level[i] = 0
 
-    def __pre_frame(self, gamestate, event_bytes):
+        slp_version = (major, minor, version_num)
+
+        if slp_version >= (3, 9, 0):
+            shift_jis_hash = b'\x81\x94'.decode('shift-jis')
+
+            for i in range(4):
+                self._display_names[i] = read_shift_jis(event_bytes, 0x1A5 + 0x1F * i)
+
+                connect_code = read_shift_jis(event_bytes, 0x221 + 0xA * i)
+                self._connect_codes[i] = connect_code.replace(shift_jis_hash, '#')
+
+            print(self._display_names)
+            print(self._connect_codes)
+
+    def __pre_frame(self, gamestate: GameState, event_bytes):
         # Grab the physical controller state and put that into the controller state
         controller_port = np.ndarray((1,), ">B", event_bytes, 0x5)[0] + 1
 

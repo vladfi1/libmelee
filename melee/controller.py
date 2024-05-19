@@ -191,7 +191,7 @@ class Controller:
                 else:
                     self.release_button(item)
 
-    def press_button(self, button):
+    def press_button(self, button: enums.Button):
         """Press a single button
 
         If already pressed, this has no effect
