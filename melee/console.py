@@ -687,9 +687,6 @@ class Console:
                 connect_code = read_shift_jis(event_bytes, 0x221 + 0xA * i)
                 self._connect_codes[i] = connect_code.replace(shift_jis_hash, '#')
 
-            print(self._display_names)
-            print(self._connect_codes)
-
     def __pre_frame(self, gamestate: GameState, event_bytes):
         # Grab the physical controller state and put that into the controller state
         controller_port = np.ndarray((1,), ">B", event_bytes, 0x5)[0] + 1
