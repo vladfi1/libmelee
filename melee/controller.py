@@ -23,6 +23,13 @@ def fix_analog_stick(x: float) -> float:
     fudged = raw + 0.1  # Go slightly above the threshold to avoid rounding issues
     return (fudged / (127 * 2)) + 0.5  # Desired input value in [0, 1]
 
+def fix_analog_trigger(x: float) -> float:
+    """Fixes the analog trigger values to match Console.step output."""
+    raw = round(x * 140)  # Desired raw value in [0, 140]
+    fudged = raw + 0.1  # Go slightly above the threshold to avoid rounding issues
+    return fudged / 255  # Desired input value in [0, 1]
+
+
 class ControllerState:
     """A snapshot of the state of a virtual controller"""
 
@@ -79,7 +86,7 @@ class Controller:
             console: Console,
             port: int,
             type: enums.ControllerType = enums.ControllerType.STANDARD,
-            fix_analog_sticks: bool = True,
+            fix_analog_inputs: bool = True,
             ):
         """Create a new virtual controller
 
@@ -91,6 +98,7 @@ class Controller:
               to the [-80, 80] range that melee uses internally. This will ensure
               that the stick values from Console.step are consistent with the values
               you send as inputs, modulo the deadzone or sticks with magnitude > 80.
+              Also adjusts the analog triggers in an analogous way.
         """
         self._is_dolphin = console.is_dolphin
         if self._is_dolphin:
@@ -103,7 +111,7 @@ class Controller:
         self.logger = console.logger
         self._console = console
         self._type = type
-        self._fix_analog_sticks = fix_analog_sticks
+        self._fix_analog_inputs = fix_analog_inputs
 
         # Configure our controller with the console
         self._console.setup_dolphin_controller(port, type)
@@ -244,6 +252,8 @@ class Controller:
         if self._is_dolphin:
             if not self.pipe:
                 return
+            if self._fix_analog_inputs:
+                amount = fix_analog_trigger(amount)
             command = "SET " + str(button.value) + " " + str(amount) + "\n"
             if self.logger:
                 self.logger.log("Buttons Pressed", command, concat=True)
@@ -257,7 +267,7 @@ class Controller:
             x (float): Ranges between 0 (left) and 1 (right)
             y (float): Ranges between 0 (down) and 1 (up)
         """
-        if self._fix_analog_sticks:
+        if self._fix_analog_inputs:
             x = fix_analog_stick(x)
             y = fix_analog_stick(y)
 
