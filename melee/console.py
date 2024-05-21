@@ -82,6 +82,7 @@ class Console:
     def __init__(self,
                  path=None,
                  is_dolphin=True,
+                 is_mainline: bool = False,
                  dolphin_home_path=None,
                  tmp_home_directory=True,
                  copy_home_directory=True,
@@ -113,6 +114,7 @@ class Console:
                 If None, will assume the dolphin is remote and won't try to configure it.
             dolphin_home_path (str): Path to dolphin user directory. Optional.
             is_dolphin (bool): Is this console a dophin instance, or SLP file?
+            is_mainline (bool): Is this mainline dolphin or Ishiiruka slippi?
             tmp_home_directory (bool): Use a temporary directory for the dolphin User path
                 This is useful so instances don't interfere with each other.
             copy_home_directory (bool): Copy an existing home directory on the system.
@@ -153,6 +155,7 @@ class Console:
         """
         self.logger = logger
         self.is_dolphin = is_dolphin
+        self.is_mainline = is_mainline
         self.path = path
         self.dolphin_home_path = dolphin_home_path
         self.temp_dir = None
@@ -331,6 +334,8 @@ class Console:
         command.append(dolphin_user_path)
 
         if platform is not None:
+            if not self.is_mainline:
+                raise ValueError('Can only set platform for mainline dolphin.')
             command.append("--platform")
             command.append(platform)
 
@@ -383,16 +388,31 @@ class Console:
         if os.path.isfile(dolphin_ini_path):
             config.read(dolphin_ini_path)
 
-        for section in ["Core", "Input", "Display", "DSP"]:
+        for section in ["Core", "Input", "Display", "DSP", "Slippi"]:
             if not config.has_section(section):
                 config.add_section(section)
-        config.set("Core", 'slippienablespectator', "True")
-        config.set("Core", 'slippispectatorlocalport', str(self.slippi_port))
-        # Set online delay
-        config.set("Core", 'slippionlinedelay', str(self.online_delay))
+
+        if self.is_mainline:
+          config.set("Slippi", 'EnableSpectator', "True")
+          config.set("Slippi", 'SpectatorLocalPort', str(self.slippi_port))
+          config.set("Slippi", 'OnlineDelay', str(self.online_delay))
+          config.set("Slippi", 'BlockingPipes', str(self.blocking_input))
+
+          config.set("Slippi", "SaveReplays", str(self.save_replays))
+          if self.replay_dir:
+              config.set("Slippi", "ReplayDir", self.replay_dir)
+        else:
+          config.set("Core", 'SlippiEnableSpectator', "True")
+          config.set("Core", 'SlippiSpectatorLocalPort', str(self.slippi_port))
+          config.set("Core", 'SlippiOnlineDelay', str(self.online_delay))
+          config.set("Core", 'BlockingPipes', str(self.blocking_input))
+
+          config.set("Core", "SlippiSaveReplays", str(self.save_replays))
+          if self.replay_dir:
+              config.set("Core", "SlippiReplayDir", self.replay_dir)
+
         # Turn on background input so we don't need to have window focus on dolphin
         config.set("Input", 'backgroundinput', "True")
-        config.set("Core", 'BlockingPipes', str(self.blocking_input))
         config.set("Core", "GFXBackend", self.gfx_backend)
         config.set("Display", "Fullscreen", str(self.fullscreen))
         if self.disable_audio:
@@ -403,10 +423,6 @@ class Console:
             config.set("Core", "OverclockEnable", "True")
 
         config.set("Core", "EmulationSpeed", str(self.emulation_speed))
-
-        config.set("Core", "SlippiSaveReplays", str(self.save_replays))
-        if self.replay_dir:
-            config.set("Core", "SlippiReplayDir", self.replay_dir)
 
         with open(dolphin_ini_path, 'w') as dolphinfile:
             config.write(dolphinfile)
