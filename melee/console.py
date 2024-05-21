@@ -75,6 +75,31 @@ def read_shift_jis(event_bytes: bytes, offset: int):
         end += 1
     return event_bytes[offset:end].decode('shift-jis')
 
+def get_exe_path(path: str) -> str:
+    """Return the path to the dolphin executable"""
+    if os.path.isfile(path):
+        return path
+
+    exe_path = [path]
+    if platform.system() == "Darwin":
+        exe_path.append("Contents/MacOS")
+
+    if platform.system() == "Windows":
+        exe_name = "Slippi Dolphin.exe"
+    elif platform.system() == "Darwin":
+        exe_name = "Slippi Dolphin"
+    else: # Linux
+        exe_name = "dolphin-emu"
+
+    return os.path.join(*exe_path, exe_name)
+
+def is_mainline_dolphin(path: str) -> bool:
+    exe_path = get_exe_path(path)
+    # Ishiiruka actually gives returncode -1 and puts
+    # "Faster Melee - Slippi (3.4.0)" in stderr!
+    result = subprocess.run([exe_path, '--version'], capture_output=True)
+    return result.stdout.find(b'mainline') != -1
+
 # pylint: disable=too-many-instance-attributes
 class Console:
     """The console object that represents your Dolphin / Wii / SLP file
@@ -82,7 +107,6 @@ class Console:
     def __init__(self,
                  path=None,
                  is_dolphin=True,
-                 is_mainline: bool = False,
                  dolphin_home_path=None,
                  tmp_home_directory=True,
                  copy_home_directory=True,
@@ -155,7 +179,6 @@ class Console:
         """
         self.logger = logger
         self.is_dolphin = is_dolphin
-        self.is_mainline = is_mainline
         self.path = path
         self.dolphin_home_path = dolphin_home_path
         self.temp_dir = None
@@ -221,6 +244,11 @@ class Console:
         if self.is_dolphin:
             self._slippstream = SlippstreamClient(self.slippi_address, self.slippi_port)
             if self.path:
+                self.is_mainline = is_mainline_dolphin(path)
+
+                if self.is_mainline and self.use_exi_inputs:
+                    raise ValueError('EXI inputs not supported on mainline')
+
                 self._setup_home_directory()
         else:
             self._slippstream = SLPFileStreamer(self.path)
@@ -278,30 +306,10 @@ class Console:
             os.makedirs(pipes_path, exist_ok=True)
         return pipes_path + f"slippibot{port}"
 
-    def _get_exe_path(self, exe_name: Optional[str] = None) -> str:
-        """Return the path to the dolphin executable"""
-        if os.path.isfile(self.path):
-            return self.path
-
-        exe_path = [self.path]
-        if platform.system() == "Darwin":
-            exe_path.append("Contents/MacOS")
-
-        if not exe_name:
-          if platform.system() == "Windows":
-              exe_name = "Slippi Dolphin.exe"
-          elif platform.system() == "Darwin":
-              exe_name = "Slippi Dolphin"
-          else: # Linux
-              exe_name = "dolphin-emu"
-
-        return os.path.join(*exe_path, exe_name)
-
     def run(self,
             iso_path: Optional[str] = None,
             dolphin_user_path: Optional[str] = None,
             environment_vars: Optional[dict] = None,
-            exe_name: Optional[str] = None,
             platform: Optional[str] = None,
             ):
         """Run the Dolphin emulator.
@@ -322,7 +330,7 @@ class Console:
         """
         assert self.is_dolphin and self.path
 
-        exe_path = self._get_exe_path(exe_name)
+        exe_path = get_exe_path(self.path)
         command = [exe_path]
 
         if iso_path is not None:
