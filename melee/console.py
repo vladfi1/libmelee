@@ -5,6 +5,7 @@ is your method to start and stop Dolphin, set configs, and get the latest GameSt
 """
 
 from collections import defaultdict
+import dataclasses
 from typing import Optional
 from packaging import version
 
@@ -100,6 +101,30 @@ def is_mainline_dolphin(path: str) -> bool:
     result = subprocess.run([exe_path, '--version'], capture_output=True)
     return result.stdout.find(b'mainline') != -1
 
+@dataclasses.dataclass
+class DumpConfig:
+    dump: bool = False
+    format: Optional[str] = None
+    codec: Optional[str] = None
+    encoder: Optional[str] = None
+    path: Optional[str] = None
+
+    def update_gfx_ini(self, gfx_ini: configparser.ConfigParser):
+        section = 'Settings'
+        if not gfx_ini.has_section(section):
+            gfx_ini.add_section(section)
+        if self.format:
+            gfx_ini.set(section, 'DumpFormat', self.format)
+        if self.codec:
+            gfx_ini.set(section, 'DumpCodec', self.codec)
+        if self.encoder:
+            gfx_ini.set(section, 'DumpEncoder', self.encoder)
+        if self.path:
+            gfx_ini.set(section, 'DumpPath', self.path)
+
+        gfx_ini.set(section, 'BitrateKbps', "3000")
+        gfx_ini.set(section, 'InternalResolutionFrameDumps', "True")
+
 # pylint: disable=too-many-instance-attributes
 class Console:
     """The console object that represents your Dolphin / Wii / SLP file
@@ -130,6 +155,7 @@ class Console:
                  infinite_time: bool = False,
                  use_exi_inputs=False,
                  enable_ffw=False,
+                 dump_config: Optional[DumpConfig] = None,
                 ):
         """Create a Console object
 
@@ -166,6 +192,8 @@ class Console:
                 Only works with mainline dolphin, Ishiiruka ignores this option.
             save_replays (bool): Save slippi replays.
             replay_dir (str): Directory to save replays to. Defaults to "~/Slippi".
+            user_json_path (str): Path to custom user.json for netplay. Doesn't work on
+                Mac as the path is hardcoded.
             log_level (int): Dolphin log level.
             infinite_time (bool): Set the game to infinite time mode.
             use_exi_inputs (bool): Enable gecko code for exi dolphin inputs. This is
@@ -176,6 +204,7 @@ class Console:
                 this will likely be incompatible with netplay.
             enable_ffw (bool): Enable fast-forward mode. Useful for bot training. Must
                 have use_exi_inputs=True.
+            dump_config (DumpConfig): Settings for video dumps.
         """
         self.logger = logger
         self.is_dolphin = is_dolphin
@@ -235,6 +264,7 @@ class Console:
         if enable_ffw and not use_exi_inputs:
             raise ValueError("Must use exi inputs to enable ffw mode.")
         self.enable_ffw = enable_ffw
+        self.dump_config = dump_config
 
         # Keep a running copy of the last gamestate produced
         self._prev_gamestate = GameState()
@@ -396,7 +426,7 @@ class Console:
         if os.path.isfile(dolphin_ini_path):
             config.read(dolphin_ini_path)
 
-        for section in ["Core", "Input", "Display", "DSP", "Slippi"]:
+        for section in ["Core", "Input", "Display", "DSP", "Slippi", "Movie"]:
             if not config.has_section(section):
                 config.add_section(section)
 
@@ -432,6 +462,9 @@ class Console:
 
         config.set("Core", "EmulationSpeed", str(self.emulation_speed))
 
+        if self.dump_config:
+            config.set("Movie", 'DumpFrames', str(self.dump_config.dump))
+
         with open(dolphin_ini_path, 'w') as dolphinfile:
             config.write(dolphinfile)
 
@@ -448,11 +481,24 @@ class Console:
         logger_config.set("Options", "WriteToFile", "True")
         logger_config.set("Options", "Verbosity", str(self.log_level))
 
-        for log_type in ['SLIPPI']:
+        for log_type in ['SLIPPI', 'VIDEO', 'FRAMEDUMP']:
             logger_config.set("Logs", log_type, "True")
 
         with open(logger_ini_path, 'w') as f:
             logger_config.write(f)
+
+        # Set up graphics config
+        gfx_ini_path = os.path.join(config_path, "GFX.ini")
+
+        gfx_config = configparser.ConfigParser()
+        if os.path.isfile(gfx_ini_path):
+            gfx_config.read(gfx_ini_path)
+
+        if self.dump_config:
+            self.dump_config.update_gfx_ini(gfx_config)
+
+        with open(gfx_ini_path, 'w') as f:
+            gfx_config.write(f)
 
     def _setup_gecko_codes(self):
         ini_name = "GALE01r2.ini"
@@ -627,7 +673,10 @@ class Console:
                 print("WARNING: Something went wrong unpacking events. Data is probably missing")
                 print("\tDidn't have enough data for event")
                 return False
-            event_type = EventType(event_bytes[0])
+            try:
+                event_type = EventType(event_bytes[0])
+            except ValueError:
+                import ipdb; ipdb.set_trace()
             if event_type == EventType.PAYLOADS:
                 cursor = 0x2
                 payload_size = event_bytes[1]
