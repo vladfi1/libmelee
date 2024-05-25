@@ -140,6 +140,7 @@ class Console:
                  online_delay=2,
                  blocking_input=False,
                  polling_mode=False,
+                 skip_rollback_frames: bool = True,
                  allow_old_version=False,
                  logger=None,
                  setup_gecko_codes=True,
@@ -236,6 +237,7 @@ class Console:
         self._current_stage = enums.Stage.NO_STAGE
         self._frame = 0
         self._polling_mode = polling_mode
+        self.skip_rollback_frames = skip_rollback_frames
         self.slp_version = "unknown"
         """(str): The SLP version this stream/file currently is."""
         self._allow_old_version = allow_old_version
@@ -719,7 +721,12 @@ class Console:
                 self.__frame_bookend(gamestate, event_bytes)
                 event_bytes = event_bytes[event_size:]
                 # If this is an old frame, then don't return it.
-                if gamestate.frame <= self._frame:
+                if gamestate.frame <= self._frame and self.skip_rollback_frames:
+                    # In blocking mode we still need to flush the controllers
+                    # on rollback frames, otherwise the game will hang.
+                    if self.blocking_input:
+                        for controller in self.controllers:
+                            controller.flush()
                     return False
                 self._frame = gamestate.frame
                 return True
