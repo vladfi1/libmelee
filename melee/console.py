@@ -130,16 +130,17 @@ class Console:
     """The console object that represents your Dolphin / Wii / SLP file
     """
     def __init__(self,
-                 path=None,
-                 is_dolphin=True,
-                 dolphin_home_path=None,
-                 tmp_home_directory=True,
-                 copy_home_directory=True,
-                 slippi_address="127.0.0.1",
-                 slippi_port=51441,
-                 online_delay=2,
-                 blocking_input=False,
-                 polling_mode=False,
+                 path: Optional[str] = None,
+                 is_dolphin: bool = True,
+                 dolphin_home_path: Optional[str] = None,
+                 tmp_home_directory: bool = True,
+                 copy_home_directory: bool = True,
+                 slippi_address: str = "127.0.0.1",
+                 slippi_port: int = 51441,
+                 online_delay: int = 2,
+                 blocking_input: bool = False,
+                 polling_mode: bool =False,
+                 polling_timeout: float = 0,
                  skip_rollback_frames: bool = True,
                  allow_old_version=False,
                  logger=None,
@@ -178,6 +179,7 @@ class Console:
             polling_mode (bool): Polls input to console rather than blocking for it
                 When set, step() will always return immediately, but may be None if no
                 gamestate is available yet.
+            polling_timeout (float): In polling_mode, how long to wait for.
             allow_old_version (bool): Allow SLP versions older than 3.0.0 (rollback era)
                 Only enable if you know what you're doing. You probably don't want this.
                 Gamestates will be missing key information, come in really late, or possibly not work at all
@@ -237,6 +239,7 @@ class Console:
         self._current_stage = enums.Stage.NO_STAGE
         self._frame = 0
         self._polling_mode = polling_mode
+        self._polling_timeout = polling_timeout
         self.skip_rollback_frames = skip_rollback_frames
         self.slp_version = "unknown"
         """(str): The SLP version this stream/file currently is."""
@@ -383,7 +386,9 @@ class Console:
         if environment_vars is not None:
             env.update(environment_vars)
 
-        self._process = subprocess.Popen(command, env=env)
+        self._process = subprocess.Popen(
+            command, env=env,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def stop(self):
         """ Stop the console.
@@ -612,7 +617,8 @@ class Console:
 
         frame_ended = False
         while not frame_ended:
-            message = self._slippstream.dispatch(self._polling_mode)
+            message = self._slippstream.dispatch(
+                self._polling_mode, timeout=self._polling_timeout)
             if message:
                 if message["type"] == "connect_reply":
                     self.connected = True

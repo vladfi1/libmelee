@@ -48,9 +48,11 @@ class SLPFileStreamer:
             self._frame = frame
         return False
 
-    def dispatch(self, dummy):
+    def dispatch(self, *args, **kwargs):
         """Read a single game event off the buffer
         """
+        del args, kwargs
+
         if self._index >= len(self._contents):
             return None
 

@@ -158,12 +158,12 @@ class SlippstreamClient:
             self._worker = None
         self.running = False
 
-    def dispatch(self, polling_mode: bool):
+    def dispatch(self, polling_mode: bool, timeout: float = 0):
         """Dispatch messages with the peer (read and write packets)"""
         assert self.running, "Can only dispatch while running."
 
         try:
-            if polling_mode and not self._buffer.poll():
+            if polling_mode and not self._buffer.poll(timeout=timeout):
                 return None
             message_bytes = self._buffer.recv_bytes()
         except EOFError:
