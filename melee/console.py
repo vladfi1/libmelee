@@ -386,9 +386,7 @@ class Console:
         if environment_vars is not None:
             env.update(environment_vars)
 
-        self._process = subprocess.Popen(
-            command, env=env,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self._process = subprocess.Popen(command, env=env)
 
     def stop(self):
         """ Stop the console.
@@ -461,7 +459,8 @@ class Console:
         config.set("Core", "GFXBackend", self.gfx_backend)
         config.set("Display", "Fullscreen", str(self.fullscreen))
         if self.disable_audio:
-            config.set("DSP", "Backend", "No audio output")
+            disable_str = "No Audio Output" if self.is_mainline else "No audio output"
+            config.set("DSP", "Backend", disable_str)
 
         if self.overclock:
             config.set("Core", "Overclock", str(self.overclock))
