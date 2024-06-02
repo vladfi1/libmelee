@@ -1079,7 +1079,7 @@ class Console:
         # Add the projectile to the gamestate list
         gamestate.projectiles.append(projectile)
 
-    def __handle_slippstream_menu_event(self, event_bytes, gamestate):
+    def __handle_slippstream_menu_event(self, event_bytes, gamestate: GameState):
         """ Internal handler for slippstream menu events
 
         Modifies specified gamestate based on the event bytes
@@ -1187,7 +1187,7 @@ class Console:
                 gamestate.stage = enums.Stage.NO_STAGE
 
             # Stage Select Cursor X, Y
-            for _, player in gamestate.players.items():
+            for player in gamestate.players.values():
                 player.cursor.x = np.ndarray((1,), ">f", event_bytes, 0x31)[0]
                 player.cursor.y = np.ndarray((1,), ">f", event_bytes, 0x35)[0]
                 gamestate.stage_select_cursor_x = player.cursor.x

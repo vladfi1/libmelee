@@ -3,22 +3,30 @@ cumbersome to do on your own. The goal here is to get you into the game
 as easily as possible so you don't have to worry about it. Your AI should
 concentrate on playing the game, not futzing with menus.
 """
-from melee import enums
 import math
 
-class MenuHelper():
-    name_tag_index = 0
-    inputs_live = False
+from melee.controller import Controller
+from melee.gamestate import GameState
+from melee import enums
 
-    def menu_helper_simple(gamestate,
-                            controller,
-                            character_selected,
-                            stage_selected,
-                            connect_code="",
-                            cpu_level=0,
-                            costume=0,
-                            autostart=False,
-                            swag=False):
+class MenuHelper():
+    # State for entering a direct code.
+    name_tag_index: int = 0
+    inputs_live: bool = False
+
+    # Whether the stage has already been selected.
+    stage_selected: bool = False
+
+    @staticmethod
+    def menu_helper_simple(gamestate: GameState,
+                            controller: Controller,
+                            character_selected: enums.Character,
+                            stage_selected: enums.Stage,
+                            connect_code: str = "",
+                            cpu_level: int = 0,
+                            costume: int = 0,
+                            autostart: bool = False,
+                            swag: bool = False):
         """Siplified menu helper function to get you through the menus and into a game
 
         Does everything for you but play the game. Gets you to the right menu screen, picks
@@ -59,14 +67,16 @@ class MenuHelper():
         elif gamestate.menu_state == enums.Menu.STAGE_SELECT:
             MenuHelper.choose_stage(stage=stage_selected,
                                     gamestate=gamestate,
-                                    controller=controller)
+                                    controller=controller,
+                                    character=character_selected)
         elif gamestate.menu_state == enums.Menu.MAIN_MENU:
             if connect_code:
                 MenuHelper.choose_direct_online(gamestate=gamestate, controller=controller)
             else:
                 MenuHelper.choose_versus_mode(gamestate=gamestate, controller=controller)
 
-    def enter_direct_code(gamestate, controller, connect_code, index):
+    @staticmethod
+    def enter_direct_code(gamestate: GameState, controller, connect_code, index):
         """At the nametag entry screen, enter the given direct connect code and exit
 
         Args:
@@ -138,7 +148,12 @@ class MenuHelper():
 
         return index
 
-    def choose_character(character, gamestate, controller, cpu_level=0, costume=2, swag=False, start=False):
+    @staticmethod
+    def choose_character(
+            character: enums.Character,
+            gamestate: GameState,
+            controller: Controller,
+            cpu_level=0, costume=2, swag=False, start=False):
         """Choose a character from the character select menu
 
         Args:
@@ -165,8 +180,6 @@ class MenuHelper():
             controller.release_all()
             return
 
-        ai_state = gamestate.players[controlling_port]
-
         # Discover who is the opponent
         opponent_state = None
         for i, player in gamestate.players.items():
@@ -175,20 +188,38 @@ class MenuHelper():
                 opponent_state = player
                 break
 
+        isSlippiCSS = gamestate.menu_state == enums.Menu.SLIPPI_ONLINE_CSS
+        if isSlippiCSS:
+            ai_state = gamestate.players[1]
+            swag = True
+            if cpu_level != 0:
+                raise ValueError("Can't choose CPU in netplay.")
+        else:
+            ai_state = gamestate.players[controlling_port]
+
         cursor_x, cursor_y = ai_state.cursor_x, ai_state.cursor_y
         coin_down = ai_state.coin_down
         character_selected = ai_state.character
 
-        isSlippiCSS = False
-        if gamestate.menu_state == enums.Menu.SLIPPI_ONLINE_CSS:
-            cursor_x, cursor_y = gamestate.players[1].cursor_x, gamestate.players[1].cursor_y
-            isSlippiCSS = True
-            character_selected = gamestate.players[1].character
-        if isSlippiCSS:
-            swag = True
+        use_cpu = cpu_level > 0
 
-        row = enums.from_internal(character) // 9
-        column = enums.from_internal(character) % 9
+        # In netplay, there is a toggle near the character portrait for switching
+        # between Sheik and Zelda which (sensibly) defaults to Sheik.
+        if isSlippiCSS and character is enums.Character.ZELDA:
+            # TODO: we should raise this earlier, before the console even starts
+            raise NotImplementedError("Picking Zelda in netplay is unsupported.")
+
+        # To play as Sheik, you select Zelda and then hold A at after selecting the stage.
+        target_character = character
+        if character is enums.Character.SHEIK:
+            target_character = enums.Character.ZELDA
+            if use_cpu:
+                raise ValueError("We can't force the CPU to pick Sheik.")
+
+        correct_character = character_selected is target_character
+
+        row = enums.from_internal(target_character) // 9
+        column = enums.from_internal(target_character) % 9
         #The random slot pushes the bottom row over a slot, so compensate for that
         if row == 2:
             column = column+1
@@ -209,11 +240,14 @@ class MenuHelper():
         wiggleroom = 1.5
 
         # Set our CPU level correctly
-        if character_selected == character and (coin_down or cursor_y<0) and cpu_level>0 \
+        if use_cpu and correct_character and (coin_down or cursor_y < 0) \
             and (cpu_level != ai_state.cpu_level) or ai_state.is_holding_cpu_slider:
+
+            assert not isSlippiCSS
+
             # Is our controller type correct?
             cpu_selected = ai_state.controller_status == enums.ControllerStatus.CONTROLLER_CPU
-            if cpu_selected != (cpu_level > 0):
+            if cpu_selected != use_cpu:
                 wiggleroom = 1
                 target_y = -2.2
                 target_x = -32.2 + (15.82 * (controlling_port-1))
@@ -284,7 +318,7 @@ class MenuHelper():
             return
 
         # We are already set, so let's taunt our opponent
-        if character_selected == character and swag and not start:
+        if correct_character and swag and not start:
             delta_x = 3 * math.cos(gamestate.frame / 1.5)
             delta_y = 3 * math.sin(gamestate.frame / 1.5)
 
@@ -311,7 +345,7 @@ class MenuHelper():
             controller.tilt_analog(enums.Button.BUTTON_MAIN, x, y)
             return
 
-        if character_selected == character and swag and isSlippiCSS:
+        if correct_character and swag and isSlippiCSS:
             if gamestate.frame % 2 == 0:
                 controller.release_all()
                 return
@@ -332,7 +366,7 @@ class MenuHelper():
             return
 
         #If character is selected, and we're in of the area, and coin is down, then we're good
-        if (character_selected == character) and coin_down:
+        if correct_character and coin_down:
             if gamestate.frame % 2 == 0:
                 controller.release_all()
                 return
@@ -355,7 +389,7 @@ class MenuHelper():
             controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, .5)
 
             # The slippi menu doesn't have a coin down. We can make-do
-            if isSlippiCSS and (character_selected != character):
+            if isSlippiCSS and (not correct_character):
                 if gamestate.frame % 5 == 0:
                     controller.press_button(enums.Button.BUTTON_B)
                     controller.release_button(enums.Button.BUTTON_A)
@@ -365,7 +399,7 @@ class MenuHelper():
                     controller.release_button(enums.Button.BUTTON_B)
                     return
 
-            if (character_selected != character) and coin_down:
+            if (not correct_character) and coin_down:
                 controller.press_button(enums.Button.BUTTON_B)
                 controller.release_button(enums.Button.BUTTON_A)
                 return
@@ -398,7 +432,13 @@ class MenuHelper():
                 return
         controller.release_all()
 
-    def choose_stage(stage, gamestate, controller):
+    @staticmethod
+    def choose_stage(
+        stage: enums.Stage,
+        gamestate: GameState,
+        controller: Controller,
+        character: enums.Character,
+    ):
         """Choose a stage from the stage select menu
 
         Intended to be called each frame while in the stage select menu
@@ -408,9 +448,21 @@ class MenuHelper():
             gamestate (gamestate.GameState): The current gamestate
             controller (controller.Controller): The controller object to press
         """
+        if gamestate.frame == 0:
+            MenuHelper.stage_selected = False
+
+        if MenuHelper.stage_selected:
+            # Select Sheik during local play.
+            if character is enums.Character.SHEIK:
+                controller.press_button(enums.Button.BUTTON_A)
+            else:
+                controller.release_all()
+            return
+
         if gamestate.frame < 20:
             controller.release_all()
             return
+
         target_x, target_y = 0, 0
         if stage == enums.Stage.BATTLEFIELD:
             target_x, target_y = 1, -9
@@ -429,6 +481,7 @@ class MenuHelper():
 
         #Wiggle room in positioning cursor
         wiggleroom = 1.5
+
         #Move up if we're too low
         if gamestate.players[controller.port].cursor.y < target_y - wiggleroom:
             controller.release_button(enums.Button.BUTTON_A)
@@ -451,8 +504,11 @@ class MenuHelper():
             return
 
         #If we get in the right area, press A
+        controller.tilt_analog(enums.Button.BUTTON_MAIN, 0.5, 0.5)
         controller.press_button(enums.Button.BUTTON_A)
+        MenuHelper.stage_selected = True
 
+    @staticmethod
     def skip_postgame(controller):
         """ Spam the start button """
         #Alternate pressing start and letting go
@@ -461,6 +517,7 @@ class MenuHelper():
         else:
             controller.release_button(enums.Button.BUTTON_START)
 
+    @staticmethod
     def change_controller_status(controller, gamestate, targetport, status, character=None):
         """Switch a given player's controller to be of the given state
 
@@ -514,6 +571,7 @@ class MenuHelper():
         else:
             controller.release_button(enums.Button.BUTTON_A)
 
+    @staticmethod
     def choose_versus_mode(gamestate, controller):
         """Helper function to bring us into the versus mode menu
 
@@ -544,6 +602,7 @@ class MenuHelper():
         else:
             controller.release_all()
 
+    @staticmethod
     def choose_direct_online(gamestate, controller):
         """Helper function to bring us into the direct connect online menu
 
