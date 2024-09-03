@@ -266,8 +266,8 @@ class Console:
         self.log_level = log_level
         self.infinite_time = infinite_time
         self.use_exi_inputs = use_exi_inputs
-        if enable_ffw and not use_exi_inputs:
-            raise ValueError("Must use exi inputs to enable ffw mode.")
+        # if enable_ffw and not use_exi_inputs:
+        #     raise ValueError("Must use exi inputs to enable ffw mode.")
         self.enable_ffw = enable_ffw
         self.dump_config = dump_config
 
