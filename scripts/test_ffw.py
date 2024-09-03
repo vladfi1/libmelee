@@ -15,6 +15,7 @@ if __name__ == '__main__':
   parser.add_argument('--slippi_port', default=51441)
   parser.add_argument('--enable_ffw', action='store_true')
   parser.add_argument('--use_exi_inputs', action='store_true')
+  parser.add_argument('--user', type=str, default=None)
 
   args = parser.parse_args()
 
@@ -28,6 +29,8 @@ if __name__ == '__main__':
       save_replays=False,
       copy_home_directory=False,
       fullscreen=False,
+      dolphin_home_path=args.user,
+      tmp_home_directory=args.user is None,
   )
 
   controllers: dict[int, melee.Controller] = {}
