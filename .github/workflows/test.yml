@@ -18,17 +18,25 @@ jobs:
       if: matrix.os == 'windows-latest'
       run: python -m pip install --upgrade pip setuptools wheel
 
-    - name: Install general dependencies (linux/osx)
-      if: matrix.os != 'windows-latest'
+    - name: Install general dependencies (osx)
+      if: matrix.os == 'macos-latest'
+      run: python3 -m pip install --upgrade --break-system-packages pip setuptools wheel
+
+    - name: Install general dependencies (linux)
+      if: matrix.os == 'ubuntu-latest'
       run: python3 -m pip install --upgrade pip setuptools wheel
 
     - name: Install libmelee dependencies (windows)
       if: matrix.os == 'windows-latest'
-      run: python -m pip install -e .
+      run: python -m pip install .
 
-    - name: Install libmelee dependencies (linux/osx)
-      if: matrix.os != 'windows-latest'
-      run: python3 -m pip install -e .
+    - name: Install libmelee dependencies (osx)
+      if: matrix.os == 'macos-latest'
+      run: python3 -m pip install --break-system-packages .
+
+    - name: Install libmelee dependencies (linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: python3 -m pip install .
 
     - name: Test with unittest (windows)
       if: matrix.os == 'windows-latest'
