@@ -63,7 +63,8 @@ class SLPFileStreamer:
             for i in range(0, num_commands):
                 command = np.ndarray((1,), ">B", self._contents, cursor)[0]
                 command_len = np.ndarray((1,), ">H", self._contents, cursor + 0x1)[0]
-                self.eventsize[command] = command_len+1
+                # Avoid uint16's leaking into self._index to prevent integer overflow.
+                self.eventsize[command] = int(command_len) + 1
                 cursor += 3
 
             wrapper = dict()
