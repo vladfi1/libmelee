@@ -3,7 +3,7 @@ setup(
     name = 'melee',
     packages = ['melee'],
     install_requires=[
-        'pyenet',
+        'pyenet@git+https://github.com/piqueserver/pyenet',
         'py-ubjson',
         'numpy',
         'pywin32; platform_system=="Windows"',
