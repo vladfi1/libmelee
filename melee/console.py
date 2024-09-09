@@ -6,6 +6,7 @@ is your method to start and stop Dolphin, set configs, and get the latest GameSt
 
 from collections import defaultdict
 import dataclasses
+import enum
 from typing import Optional
 from packaging import version
 
@@ -94,12 +95,60 @@ def get_exe_path(path: str) -> str:
 
     return os.path.join(*exe_path, exe_name)
 
-def is_mainline_dolphin(path: str) -> bool:
+class DolphinBuild(enum.Enum):
+    NETPLAY = enum.auto()
+    PLAYBACK = enum.auto()
+    EXI_AI = enum.auto()
+
+_STRING_TO_BUILD = {
+    'Playback': DolphinBuild.PLAYBACK,
+    'ExiAI': DolphinBuild.EXI_AI,
+}
+
+@dataclasses.dataclass
+class DolphinVersion:
+    mainline: bool
+    version: str
+    build: DolphinBuild
+
+def get_dolphin_version(path: str) -> DolphinVersion:
     exe_path = get_exe_path(path)
-    # Ishiiruka actually gives returncode -1 and puts
-    # "Faster Melee - Slippi (3.4.0)" in stderr!
     result = subprocess.run([exe_path, '--version'], capture_output=True)
-    return result.stdout.find(b'mainline') != -1
+
+    # Ishiiruka actually gives returncode 1 and puts
+    # "Faster Melee - Slippi (3.4.0)" in stderr!
+    output = result.stdout if result.returncode == 0 else result.stderr
+    output = output.decode().strip()
+
+    # Mainline versions look like "4.0.0-mainline-beta.4"
+    if output.find('mainline') != -1:
+        version = output.split('-')[0]
+        return DolphinVersion(
+            mainline=True,
+            version=version,
+            # Mainline only supports netplay for now.
+            build=DolphinBuild.NETPLAY,
+        )
+
+    # Ishiiruka
+    contents = output.split(' - ')
+    if contents[0] != 'Faster Melee':
+        raise ValueError(f'Unexpected dolphin version {output}')
+
+    # "Slippi (VERSION)"
+    begin = contents[1].find('(') + 1
+    end = contents[1].find(')')
+    version = contents[1][begin:end]
+
+    if len(contents) == 2:
+        build = DolphinBuild.NETPLAY
+    else:
+        build_str = contents[2]
+        if build_str not in _STRING_TO_BUILD:
+            raise ValueError(f'Unexpected dolphin version {output}')
+        build = _STRING_TO_BUILD[build_str]
+
+    return DolphinVersion(False, version, build)
 
 @dataclasses.dataclass
 class DumpConfig:
@@ -279,10 +328,13 @@ class Console:
         if self.is_dolphin:
             self._slippstream = SlippstreamClient(self.slippi_address, self.slippi_port)
             if self.path:
-                self.is_mainline = is_mainline_dolphin(path)
+                self.dolphin_version = get_dolphin_version(path)
+                self.is_mainline = self.dolphin_version.mainline
 
-                if self.is_mainline and self.use_exi_inputs:
-                    raise ValueError('EXI inputs not supported on mainline')
+                if self.use_exi_inputs and self.dolphin_version.build != DolphinBuild.EXI_AI:
+                    raise ValueError(
+                        'EXI inputs require a custom dolphin build. '
+                        'See https://github.com/vladfi1/libmelee?tab=readme-ov-file#setup-instructions')
 
                 self._setup_home_directory()
         else:
