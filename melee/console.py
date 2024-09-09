@@ -331,6 +331,10 @@ class Console:
                 self.dolphin_version = get_dolphin_version(path)
                 self.is_mainline = self.dolphin_version.mainline
 
+                if gfx_backend == 'Null':
+                    if not (self.is_mainline or self.dolphin_version.build == DolphinBuild.EXI_AI):
+                        raise ValueError('Null video requires mainline or ExiAI Ishiiruka.')
+
                 if self.use_exi_inputs and self.dolphin_version.build != DolphinBuild.EXI_AI:
                     raise ValueError(
                         'EXI inputs require a custom dolphin build. '
