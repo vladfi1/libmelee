@@ -3,7 +3,7 @@ name: libmelee test cases
 on: [push, pull_request]
 
 jobs:
-  build:
+  test:
 
     runs-on: ${{ matrix.os }}
     strategy:
@@ -12,7 +12,7 @@ jobs:
         os: ['ubuntu-latest', 'windows-latest', 'macos-latest']
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
 
     - name: Install general dependencies (windows)
       if: matrix.os == 'windows-latest'
@@ -45,3 +45,47 @@ jobs:
     - name: Test with unittest (linux/osx)
       if: matrix.os != 'windows-latest'
       run: python3 test.py
+
+  # "live" test with a running emulator, only on Ubuntu
+  test_live:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10']
+        os: ['ubuntu-latest']
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Libmelee
+        run: |
+          python3 -m pip install .
+
+      - name: Download ExiAI Dolphin
+        # TODO: specify release version in repo?
+        run: |
+          curl -OL https://github.com/vladfi1/slippi-Ishiiruka/releases/download/exi-ai-0.1.0/Slippi_Online-x86_64-ExiAI.AppImage
+          chmod +x Slippi_Online-x86_64-ExiAI.AppImage
+
+      - name: Install dolphin dependencies
+        run: sudo apt install -y libfuse2 libegl1
+
+      - name: Cache the SSBM iso
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/cache@v3
+        id: cache-iso  # give it a name for checking the cache hit-or-not
+        with:
+          path: SSBM.iso
+          key: ssbm-iso
+
+      - name: Download the SSBM iso
+        if: steps.cache-iso.outputs.cache-hit != 'true'
+        env:
+          SSBM_ISO_DRIVE_ID: ${{ secrets.SSBM_ISO_DRIVE_ID }}
+        run: |
+          python3 -m pip install gdown
+          gdown "https://drive.google.com/uc?id=$SSBM_ISO_DRIVE_ID" -O SSBM.iso
+
+      - name: Run live test
+        run: python3 test_live.py --dolphin=./Slippi_Online-x86_64-ExiAI.AppImage --iso=SSBM.iso --headless
