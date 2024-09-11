@@ -9,6 +9,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--dolphin', type=str, required=True)
 parser.add_argument('--iso', type=str, required=True)
 parser.add_argument('--headless', action='store_true')
+parser.add_argument('--ffw', action='store_true')
 
 def build_console() -> melee.Console:
     kwargs = dict(
@@ -22,6 +23,11 @@ def build_console() -> melee.Console:
         kwargs.update(
             gfx_backend='Null',
             disable_audio=True,
+        )
+    if ARGS.ffw:
+        kwargs.update(
+            use_exi_inputs=True,
+            enable_ffw=True,
         )
     return melee.Console(**kwargs)
 

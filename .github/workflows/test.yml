@@ -89,3 +89,6 @@ jobs:
 
       - name: Run live test
         run: python3 test_live.py --dolphin=./Slippi_Online-x86_64-ExiAI.AppImage --iso=SSBM.iso --headless
+
+      - name: Run live test with EXI/FFW codes
+        run: python3 test_live.py --dolphin=./Slippi_Online-x86_64-ExiAI.AppImage --iso=SSBM.iso --headless --ffw
