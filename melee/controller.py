@@ -1,7 +1,6 @@
 """ Defines a Clontroller class that manages pressing buttons for your console"""
 
 import platform
-import sys
 import copy
 import time
 try:
@@ -160,10 +159,12 @@ class Controller:
 
     def disconnect(self):
         """Disconnects the controller from the console"""
-        if self._is_dolphin:
-            if self.pipe:
+        if self._is_dolphin and self.pipe:
+            try:
                 self.pipe.close()
-                self.pipe = None
+            except BrokenPipeError:
+                pass
+            self.pipe = None
 
     def simple_press(self, x, y, button):
         """Here is a simpler representation of a button press, in case
