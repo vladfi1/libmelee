@@ -203,6 +203,7 @@ class Console:
                  replay_dir=None,
                  user_json_path: Optional[str] = None,
                  log_level: int = 3,  # WARN, see Source/Core/Common/Logging/Log.h
+                 log_types: list[str] = ['SLIPPI'],
                  infinite_time: bool = False,
                  use_exi_inputs=False,
                  enable_ffw=False,
@@ -313,6 +314,7 @@ class Console:
         self.replay_dir = replay_dir
         self.user_json_path = user_json_path
         self.log_level = log_level
+        self.log_types = log_types
         self.infinite_time = infinite_time
         self.use_exi_inputs = use_exi_inputs
         if enable_ffw and not use_exi_inputs:
@@ -543,7 +545,7 @@ class Console:
         logger_config.set("Options", "WriteToFile", "True")
         logger_config.set("Options", "Verbosity", str(self.log_level))
 
-        for log_type in ['SLIPPI', 'VIDEO', 'FRAMEDUMP']:
+        for log_type in self.log_types:
             logger_config.set("Logs", log_type, "True")
 
         with open(logger_ini_path, 'w') as f:
