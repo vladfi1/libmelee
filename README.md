@@ -20,7 +20,7 @@ pip install "git+https://github.com/vladfi1/libmelee"
 
 Linux / OSX / Windows
 
-1. You can install and configure Slippi just like you would for rollback netplay -- see https://slippi.gg for instructions. Alternatively, if you want to use fast-forward mode, you will need to use my [fork](https://github.com/vladfi1/slippi-Ishiiruka/tree/exi-ai) of slippi-Ishiiruka. A prebuilt Linux AppImage is avaiable [here](https://drive.google.com/file/d/1I_GZz6Xtll2Sgy4QcOQbWK0IcQKdsF5X/view?usp=sharing), which can be used like a regular executable. This build is also headless, meaning it has no graphical elements at all.
+1. You can install and configure Slippi just like you would for rollback netplay -- see https://slippi.gg for instructions. Alternatively, if you want to use fast-forward mode, you will need to use my [fork](https://github.com/vladfi1/slippi-Ishiiruka/tree/exi-ai-rebase) of slippi-Ishiiruka. A prebuilt Linux AppImage is avaiable [here](https://github.com/vladfi1/slippi-Ishiiruka/releases/download/exi-ai-0.1.0/Slippi_Online-x86_64-ExiAI.AppImage), which can be used like a regular executable. This build is also headless, meaning it has no graphical elements at all.
 
 2. If you want to play interactively with or against your AI, you'll probably want a GameCube Adapter, available on [Amazon](https://www.amazon.com/Super-Smash-GameCube-Adapter-Wii-U/dp/B00L3LQ1FI). Alternatively the [HitBox adapter](https://www.hitboxarcade.com/products/gamecube-controller-adapter) works well too.
 
