@@ -1,4 +1,9 @@
-from setuptools import setup, find_packages
+from setuptools import setup
+
+version = {}
+with open("melee/version.py") as fp:
+    exec(fp.read(), version)
+
 setup(
     name = 'melee',
     packages = ['melee'],
@@ -9,7 +14,7 @@ setup(
         'pywin32; platform_system=="Windows"',
         'packaging'
     ],
-    version = '0.36.0',
+    version = version['__version__'],
     description = 'Open API written in Python 3 for making your own Smash Bros: Melee AI that works with Slippi Online',
     author = 'AltF4',
     author_email = 'altf4petro@gmail.com',
