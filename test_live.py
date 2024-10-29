@@ -1,4 +1,5 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
+
 import unittest
 import sys
 import melee
@@ -18,6 +19,7 @@ def build_console() -> melee.Console:
         blocking_input=True,
         online_delay=0,
         save_replays=False,
+        fullscreen=False,
     )
     if ARGS.headless:
         kwargs.update(
@@ -47,6 +49,7 @@ class DolphinTest(unittest.TestCase):
         """
         Start up the console and select our charcter
         """
+        menu_helper = melee.MenuHelper()
         console = build_console()
         controller = melee.Controller(console=console,
                                       port=1,
@@ -66,14 +69,15 @@ class DolphinTest(unittest.TestCase):
                 if gamestate.menu_state == melee.Menu.IN_GAME:
                     pass
                 else:
-                    melee.MenuHelper.menu_helper_simple(gamestate,
-                                                        controller,
-                                                        melee.Character.FOX,
-                                                        melee.Stage.BATTLEFIELD,
-                                                        "",
-                                                        costume=1,
-                                                        autostart=False,
-                                                        swag=False)
+                    menu_helper.menu_helper_simple(
+                        gamestate,
+                        controller,
+                        melee.Character.FOX,
+                        melee.Stage.BATTLEFIELD,
+                        "",
+                        costume=1,
+                        autostart=False,
+                        swag=False)
                     if gamestate.menu_state == melee.Menu.CHARACTER_SELECT and (gamestate.frame > 30):
                         self.assertEqual(gamestate.players[1].character, melee.Character.FOX)
                         break
@@ -85,6 +89,7 @@ class DolphinTest(unittest.TestCase):
         """
         Two controllers, get into game
         """
+        menu_helper = melee.MenuHelper()
         console = build_console()
         controller_one = melee.Controller(console=console,
                                       port=1,
@@ -161,22 +166,24 @@ class DolphinTest(unittest.TestCase):
                     if gamestate.frame == 60:
                         break
                 else:
-                    melee.MenuHelper.menu_helper_simple(gamestate,
-                                                        controller_one,
-                                                        melee.Character.FOX,
-                                                        melee.Stage.FINAL_DESTINATION,
-                                                        "",
-                                                        costume=1,
-                                                        autostart=True,
-                                                        swag=False)
-                    melee.MenuHelper.menu_helper_simple(gamestate,
-                                                        controller_two,
-                                                        melee.Character.MARTH,
-                                                        melee.Stage.FINAL_DESTINATION,
-                                                        "",
-                                                        costume=1,
-                                                        autostart=False,
-                                                        swag=False)
+                    menu_helper.menu_helper_simple(
+                        gamestate,
+                        controller_one,
+                        melee.Character.FOX,
+                        melee.Stage.FINAL_DESTINATION,
+                        "",
+                        costume=1,
+                        autostart=True,
+                        swag=False)
+                    menu_helper.menu_helper_simple(
+                        gamestate,
+                        controller_two,
+                        melee.Character.MARTH,
+                        melee.Stage.FINAL_DESTINATION,
+                        "",
+                        costume=1,
+                        autostart=False,
+                        swag=False)
         finally:
             console.stop()
             controller_one.disconnect()

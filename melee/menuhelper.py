@@ -4,29 +4,34 @@ as easily as possible so you don't have to worry about it. Your AI should
 concentrate on playing the game, not futzing with menus.
 """
 import math
+from typing import Optional
 
 from melee.controller import Controller
 from melee.gamestate import GameState
 from melee import enums
 
 class MenuHelper():
-    # State for entering a direct code.
-    name_tag_index: int = 0
-    inputs_live: bool = False
 
-    # Whether the stage has already been selected.
-    stage_selected: bool = False
+    def __init__(self) -> None:
+        # State for entering a direct code.
+        self.name_tag_index: int = 0
+        self.inputs_live: bool = False
 
-    @staticmethod
-    def menu_helper_simple(gamestate: GameState,
-                            controller: Controller,
-                            character_selected: enums.Character,
-                            stage_selected: enums.Stage,
-                            connect_code: str = "",
-                            cpu_level: int = 0,
-                            costume: int = 0,
-                            autostart: bool = False,
-                            swag: bool = False):
+        # Whether the stage has already been selected.
+        self.stage_selected: bool = False
+
+    def menu_helper_simple(
+        self,
+        gamestate: GameState,
+        controller: Controller,
+        character_selected: enums.Character,
+        stage_selected: enums.Stage,
+        connect_code: str = "",
+        cpu_level: int = 0,
+        costume: int = 0,
+        autostart: bool = False,
+        swag: bool = False,
+    ):
         """Siplified menu helper function to get you through the menus and into a game
 
         Does everything for you but play the game. Gets you to the right menu screen, picks
@@ -48,35 +53,37 @@ class MenuHelper():
         # If we're at the character select screen, choose our character
         if gamestate.menu_state in [enums.Menu.CHARACTER_SELECT, enums.Menu.SLIPPI_ONLINE_CSS]:
             if gamestate.submenu == enums.SubMenu.NAME_ENTRY_SUBMENU:
-                MenuHelper.name_tag_index = MenuHelper.enter_direct_code(gamestate=gamestate,
-                                                           controller=controller,
-                                                           connect_code=connect_code,
-                                                           index=MenuHelper.name_tag_index)
+                self.enter_direct_code(
+                    gamestate=gamestate,
+                    controller=controller,
+                    connect_code=connect_code)
             else:
-                MenuHelper.choose_character(character=character_selected,
-                                            gamestate=gamestate,
-                                            controller=controller,
-                                            cpu_level=cpu_level,
-                                            costume=costume,
-                                            swag=swag,
-                                            start=autostart)
+                self.name_tag_index = 0
+                self.choose_character(
+                    character=character_selected,
+                    gamestate=gamestate,
+                    controller=controller,
+                    cpu_level=cpu_level,
+                    costume=costume,
+                    swag=swag,
+                    start=autostart)
         # If we're at the postgame scores screen, spam START
         elif gamestate.menu_state == enums.Menu.POSTGAME_SCORES:
-            MenuHelper.skip_postgame(controller=controller)
+            self.skip_postgame(controller=controller)
         # If we're at the stage select screen, choose a stage
         elif gamestate.menu_state == enums.Menu.STAGE_SELECT:
-            MenuHelper.choose_stage(stage=stage_selected,
-                                    gamestate=gamestate,
-                                    controller=controller,
-                                    character=character_selected)
+            self.choose_stage(stage=stage_selected,
+                              gamestate=gamestate,
+                              controller=controller,
+                              character=character_selected)
         elif gamestate.menu_state == enums.Menu.MAIN_MENU:
             if connect_code:
-                MenuHelper.choose_direct_online(gamestate=gamestate, controller=controller)
+                self.choose_direct_online(gamestate=gamestate, controller=controller)
             else:
-                MenuHelper.choose_versus_mode(gamestate=gamestate, controller=controller)
+                self.choose_versus_mode(gamestate=gamestate, controller=controller)
 
-    @staticmethod
-    def enter_direct_code(gamestate: GameState, controller, connect_code, index):
+    def enter_direct_code(
+            self, gamestate: GameState, controller: Controller, connect_code: str):
         """At the nametag entry screen, enter the given direct connect code and exit
 
         Args:
@@ -92,22 +99,22 @@ class MenuHelper():
         #   So if the first character is A, then the input can get eaten
         #   Account for this by making sure we can move off the letter first
         if gamestate.menu_selection != 45:
-            MenuHelper.inputs_live = True
+            self.inputs_live = True
 
-        if not MenuHelper.inputs_live:
+        if not self.inputs_live:
             controller.tilt_analog(enums.Button.BUTTON_MAIN, 1, .5)
-            return index
+            return
 
         # Let the controller go every other frame. Makes the logic below easier
         if gamestate.frame % 2 == 0:
             controller.release_all()
-            return index
+            return
 
-        if len(connect_code) == index:
+        if len(connect_code) == self.name_tag_index:
             controller.press_button(enums.Button.BUTTON_START)
-            return index
+            return
 
-        target_character = connect_code[index]
+        target_character = connect_code[self.name_tag_index]
         target_code = 45
         column = "ABCDEFGHIJ".find(target_character)
         if column != -1:
@@ -124,11 +131,12 @@ class MenuHelper():
 
         if gamestate.menu_selection == target_code:
             controller.press_button(enums.Button.BUTTON_A)
-            return index + 1
+            self.name_tag_index += 1
+            return
 
         if gamestate.menu_selection == 57:
             controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, 1)
-            return index
+            return
 
         diff = abs(target_code - gamestate.menu_selection)
         # If the target is greater than our position, move down / left
@@ -146,14 +154,12 @@ class MenuHelper():
             else:
                 controller.tilt_analog(enums.Button.BUTTON_MAIN, 1, .5)
 
-        return index
-
-    @staticmethod
     def choose_character(
-            character: enums.Character,
-            gamestate: GameState,
-            controller: Controller,
-            cpu_level=0, costume=2, swag=False, start=False):
+        self,
+        character: enums.Character,
+        gamestate: GameState,
+        controller: Controller,
+        cpu_level=0, costume=2, swag=False, start=False):
         """Choose a character from the character select menu
 
         Args:
@@ -432,8 +438,8 @@ class MenuHelper():
                 return
         controller.release_all()
 
-    @staticmethod
     def choose_stage(
+        self,
         stage: enums.Stage,
         gamestate: GameState,
         controller: Controller,
@@ -449,9 +455,9 @@ class MenuHelper():
             controller (controller.Controller): The controller object to press
         """
         if gamestate.frame == 0:
-            MenuHelper.stage_selected = False
+            self.stage_selected = False
 
-        if MenuHelper.stage_selected:
+        if self.stage_selected:
             # Select Sheik during local play.
             if character is enums.Character.SHEIK:
                 controller.press_button(enums.Button.BUTTON_A)
@@ -506,10 +512,9 @@ class MenuHelper():
         #If we get in the right area, press A
         controller.tilt_analog(enums.Button.BUTTON_MAIN, 0.5, 0.5)
         controller.press_button(enums.Button.BUTTON_A)
-        MenuHelper.stage_selected = True
+        self.stage_selected = True
 
-    @staticmethod
-    def skip_postgame(controller):
+    def skip_postgame(self, controller: Controller):
         """ Spam the start button """
         #Alternate pressing start and letting go
         if controller.prev.button[enums.Button.BUTTON_START] == False:
@@ -518,7 +523,12 @@ class MenuHelper():
             controller.release_button(enums.Button.BUTTON_START)
 
     @staticmethod
-    def change_controller_status(controller, gamestate, targetport, status, character=None):
+    def change_controller_status(
+        controller: Controller,
+        gamestate: GameState,
+        targetport: int,
+        status: enums.ControllerStatus,
+        character: Optional[enums.Character] = None):
         """Switch a given player's controller to be of the given state
 
         Note:
@@ -572,7 +582,7 @@ class MenuHelper():
             controller.release_button(enums.Button.BUTTON_A)
 
     @staticmethod
-    def choose_versus_mode(gamestate, controller):
+    def choose_versus_mode(gamestate: GameState, controller: Controller):
         """Helper function to bring us into the versus mode menu
 
         Args:
@@ -603,7 +613,7 @@ class MenuHelper():
             controller.release_all()
 
     @staticmethod
-    def choose_direct_online(gamestate, controller):
+    def choose_direct_online(gamestate: GameState, controller: Controller):
         """Helper function to bring us into the direct connect online menu
 
         Args:
