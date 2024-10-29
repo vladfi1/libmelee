@@ -14,6 +14,7 @@ setup(
         'pywin32; platform_system=="Windows"',
         'packaging'
     ],
+    python_requires='>=3.9',
     version = version['__version__'],
     description = 'Open API written in Python 3 for making your own Smash Bros: Melee AI that works with Slippi Online',
     author = 'AltF4',
@@ -23,5 +24,5 @@ setup(
     keywords = ['dolphin', 'AI', 'video games', 'melee', 'smash bros', 'slippi'],
     classifiers = [],
     license = "LGPLv3",
-    include_package_data=True
+    include_package_data=True,
 )
