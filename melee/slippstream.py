@@ -5,7 +5,6 @@ This can be used to talk to some server implementing the Slippstream protocol
 (i.e. the Project Slippi fork of Nintendont or Slippi Ishiiruka).
 """
 
-from audioop import add
 from enum import Enum
 import logging
 import enet

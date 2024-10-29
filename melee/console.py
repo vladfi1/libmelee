@@ -444,7 +444,7 @@ class Console:
         if environment_vars is not None:
             env.update(environment_vars)
 
-        self._process = subprocess.Popen(command, env=env)
+        self._process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     def stop(self):
         """ Stop the console.
@@ -676,29 +676,29 @@ class Console:
         while not frame_ended:
             message = self._slippstream.dispatch(
                 self._polling_mode, timeout=self._polling_timeout)
-            if message:
-                if message["type"] == "connect_reply":
-                    self.connected = True
-                    self.nick = message["nick"]
-                    self.version = message["version"]
-                    self.cursor = message["cursor"]
-
-                elif message["type"] == "game_event":
-                    if len(message["payload"]) > 0:
-                        if self.is_dolphin:
-                            frame_ended = self.__handle_slippstream_events(base64.b64decode(message["payload"]), self._temp_gamestate)
-                        else:
-                            frame_ended = self.__handle_slippstream_events(message["payload"], self._temp_gamestate)
-
-                elif message["type"] == "menu_event":
-                    if len(message["payload"]) > 0:
-                        self.__handle_slippstream_menu_event(base64.b64decode(message["payload"]), self._temp_gamestate)
-                        frame_ended = True
-
-                elif self._use_manual_bookends and message["type"] == "frame_end" and self._frame != -10000:
-                    frame_ended = True
-            else:
+            if message is None:
                 return None
+
+            if message["type"] == "connect_reply":
+                self.connected = True
+                self.nick = message["nick"]
+                self.version = message["version"]
+                self.cursor = message["cursor"]
+
+            elif message["type"] == "game_event":
+                if len(message["payload"]) > 0:
+                    if self.is_dolphin:
+                        frame_ended = self.__handle_slippstream_events(base64.b64decode(message["payload"]), self._temp_gamestate)
+                    else:
+                        frame_ended = self.__handle_slippstream_events(message["payload"], self._temp_gamestate)
+
+            elif message["type"] == "menu_event":
+                if len(message["payload"]) > 0:
+                    self.__handle_slippstream_menu_event(base64.b64decode(message["payload"]), self._temp_gamestate)
+                    frame_ended = True
+
+            elif self._use_manual_bookends and message["type"] == "frame_end" and self._frame != -10000:
+                frame_ended = True
 
         gamestate = self._temp_gamestate
         self._temp_gamestate = None
@@ -1310,14 +1310,14 @@ class Console:
             if gamestate.players[port].controller_status != enums.ControllerStatus.CONTROLLER_CPU:
                 gamestate.players[port].cpu_level = 0
 
-    def __fixframeindexing(self, gamestate):
+    def __fixframeindexing(self, gamestate: GameState):
         """ Melee's indexing of action frames is wildly inconsistent.
             Here we adjust all of the frames to be indexed at 1 (so math is easier)"""
         for _, player in gamestate.players.items():
             if player.action.value in self.zero_indices[player.character.value]:
                 player.action_frame = player.action_frame + 1
 
-    def __fixiasa(self, gamestate):
+    def __fixiasa(self, gamestate: GameState):
         """ The IASA flag doesn't set or reset for special attacks.
             So let's just set IASA to False for all non-A attacks.
         """
