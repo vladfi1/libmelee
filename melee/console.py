@@ -444,7 +444,7 @@ class Console:
         if environment_vars is not None:
             env.update(environment_vars)
 
-        self._process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self._process = subprocess.Popen(command, env=env)
 
     def stop(self):
         """ Stop the console.
