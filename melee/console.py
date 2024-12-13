@@ -252,8 +252,7 @@ class Console:
             use_exi_inputs (bool): Enable gecko code for exi dolphin inputs. This is
                 necessary for fast-forward mode which ignores dolphin's normal polling.
                 Must be used with a compatible Ishiiruka branch such as
-                https://github.com/altf4/Ishiiruka/tree/feature/ai-inputs-exi-pr
-                or https://github.com/vladfi1/slippi-Ishiiruka/tree/exi-ai. Note that
+                https://github.com/vladfi1/slippi-Ishiiruka/tree/exi-ai-rebase. Note that
                 this will likely be incompatible with netplay.
             enable_ffw (bool): Enable fast-forward mode. Useful for bot training. Must
                 have use_exi_inputs=True.
