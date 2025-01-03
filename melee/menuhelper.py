@@ -141,7 +141,9 @@ class MenuHelper():
             controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, 1)
             return
 
-        diff = abs(target_code - gamestate.menu_selection)
+        # menu_selection is an unsigned byte; on certain numpy versions this
+        # will cause an overflow error. Cast to int to avoid this.
+        diff = abs(target_code - int(gamestate.menu_selection))
         # If the target is greater than our position, move down / left
         if gamestate.menu_selection <= target_code - 5:
             # If the diff is less than 5, then move vertically
