@@ -58,7 +58,10 @@ class MenuHelper():
                     controller=controller,
                     connect_code=connect_code)
             else:
+                # We've exited the name entry screen, so reset the state in case we go back
                 self.name_tag_index = 0
+                self.inputs_live = False
+
                 self.choose_character(
                     character=character_selected,
                     gamestate=gamestate,
