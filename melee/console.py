@@ -809,6 +809,10 @@ class Console:
                 self.__item_update(gamestate, event_bytes)
                 event_bytes = event_bytes[event_size:]
 
+            elif event_type in [EventType.FOD_INFO, EventType.DL_INFO, EventType.PS_INFO]:
+                # TODO: Handle these events
+                event_bytes = event_bytes[event_size:]
+
             else:
                 logging.error("Got an unhandled event type: %s", event_type)
                 return False

@@ -25,10 +25,17 @@ class EventType(Enum):
     FRAME_START = 0x3a
     ITEM_UPDATE = 0x3b
     FRAME_BOOKEND = 0x3c
+    GECKO_LIST = 0x3d
+    FOD_INFO = 0x3f
+    DL_INFO = 0x40
+    PS_INFO = 0x41
+
+    BONES = 0x60
 
     # This is not used in-game. All menu events have this type.
     # Due to a bug, dolphin sometimes sends these before the game has ended.
     MENU_EVENT = 0x3e
+
 
 class CommType(Enum):
     """ Types of SlippiComm messages """
