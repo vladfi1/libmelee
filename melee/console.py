@@ -28,7 +28,7 @@ import tempfile
 from melee import enums
 from melee.enums import Action
 from melee.gamestate import GameState, Projectile, PlayerState
-from melee.slippstream import SlippstreamClient, EventType
+from melee.slippstream import SlippstreamClient, EventType, EVENT_TO_STAGE
 from melee.slpfilestreamer import SLPFileStreamer
 from melee import stages
 
@@ -813,6 +813,11 @@ class Console:
                 # TODO: Handle these events
                 event_bytes = event_bytes[event_size:]
 
+                expected_stage = EVENT_TO_STAGE[event_type]
+
+                if self._current_stage is not expected_stage:
+                    logging.warning("Got stage info for %s, but gamestate says %s", expected_stage, gamestate.stage)
+
             else:
                 logging.error("Got an unhandled event type: %s", event_type)
                 return False
@@ -916,7 +921,7 @@ class Console:
         if self._use_manual_bookends:
             self._frame = gamestate.frame
 
-    def __post_frame(self, gamestate, event_bytes):
+    def __post_frame(self, gamestate: GameState, event_bytes):
         gamestate.stage = self._current_stage
         gamestate.is_teams = self._is_teams
         gamestate.frame = np.ndarray((1,), ">i", event_bytes, 0x1)[0]

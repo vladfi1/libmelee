@@ -13,6 +13,8 @@ import multiprocessing as mp
 from multiprocessing.connection import Connection
 from multiprocessing.synchronize import Event
 
+from melee.enums import Stage
+
 # pylint: disable=too-few-public-methods
 class EventType(Enum):
     """ Replay event types """
@@ -36,6 +38,11 @@ class EventType(Enum):
     # Due to a bug, dolphin sometimes sends these before the game has ended.
     MENU_EVENT = 0x3e
 
+EVENT_TO_STAGE = {
+    EventType.FOD_INFO: Stage.FOUNTAIN_OF_DREAMS,
+    EventType.DL_INFO: Stage.DREAMLAND,
+    EventType.PS_INFO: Stage.POKEMON_STADIUM,
+}
 
 class CommType(Enum):
     """ Types of SlippiComm messages """
