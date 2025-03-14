@@ -184,7 +184,7 @@ class Console:
                  is_dolphin: bool = True,
                  dolphin_home_path: Optional[str] = None,
                  tmp_home_directory: bool = True,
-                 copy_home_directory: bool = True,
+                 copy_home_directory: bool = False,
                  slippi_address: str = "127.0.0.1",
                  slippi_port: int = 51441,
                  online_delay: int = 0,
