@@ -32,7 +32,7 @@ class MenuHelper():
         autostart: bool = False,
         swag: bool = False,
     ):
-        """Siplified menu helper function to get you through the menus and into a game
+        """Simplified menu helper function to get you through the menus and into a game
 
         Does everything for you but play the game. Gets you to the right menu screen, picks
         your character, chooses the stage, enters connect codes, etc...
