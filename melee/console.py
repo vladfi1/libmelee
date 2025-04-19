@@ -337,6 +337,15 @@ class Console:
                     if not (self.is_mainline or self.dolphin_version.build == DolphinBuild.EXI_AI):
                         raise ValueError('Null video requires mainline or ExiAI Ishiiruka.')
 
+                if self.dolphin_version.build is DolphinBuild.EXI_AI:
+                    if not gfx_backend:
+                        self.gfx_backend = 'Null'
+                        logging.info('ExiAI dolphin detected, setting Null video backend.')
+                        # TODO: modify ExiAI dolphin to use Null by default
+                    elif gfx_backend != 'Null':
+                        # In principle ExiAI could support something like EGL...
+                        raise ValueError('ExiAI dolphin requires Null video backend.')
+
                 if self.use_exi_inputs and self.dolphin_version.build != DolphinBuild.EXI_AI:
                     raise ValueError(
                         'EXI inputs require a custom dolphin build. '
