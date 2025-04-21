@@ -4,21 +4,9 @@ Reads Slippi game events from SLP file rather than over network
 """
 
 import ubjson
-from enum import Enum
 import numpy as np
 
-# pylint: disable=too-few-public-methods
-class EventType(Enum):
-    """ Replay event types """
-    GECKO_CODES = 0x10
-    PAYLOADS = 0x35
-    GAME_START = 0x36
-    PRE_FRAME = 0x37
-    POST_FRAME = 0x38
-    GAME_END = 0x39
-    FRAME_START = 0x3a
-    ITEM_UPDATE = 0x3b
-    FRAME_BOOKEND = 0x3c
+from melee.slippstream import EventType
 
 class SLPFileStreamer:
     def __init__(self, path):
