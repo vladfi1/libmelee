@@ -96,6 +96,9 @@ def get_exe_path(path: str) -> str:
 
     return os.path.join(*exe_path, exe_name)
 
+
+# TODO: custom mainline builds can have headless support -- we should include
+# that in the version output and parse it in get_dolphin_version
 class DolphinBuild(enum.Enum):
     NETPLAY = enum.auto()
     PLAYBACK = enum.auto()
@@ -128,6 +131,17 @@ def get_dolphin_version(path: str) -> DolphinVersion:
             mainline=True,
             version=version,
             # Mainline only supports netplay for now.
+            build=DolphinBuild.NETPLAY,
+        )
+
+    # Ishiiruka on MacOS behaves a bit differently.
+    if platform.system() == 'Darwin':
+        # Sadly playback dolphin doesn't output anything differently, so we
+        # just assume it's a netplay build.
+        assert result.returncode == 255
+        return DolphinVersion(
+            mainline=False,
+            version=result.stdout.decode().strip(),
             build=DolphinBuild.NETPLAY,
         )
 
