@@ -1137,22 +1137,17 @@ class Console:
         ydist = player_one_y - player_two_y
         gamestate.distance = math.sqrt((xdist**2) + (ydist**2))
 
-    def __item_update(self, gamestate, event_bytes):
+    def __item_update(self, gamestate: GameState, event_bytes: bytes):
         projectile = Projectile()
         projectile.position.x = np.ndarray((1,), ">f", event_bytes, 0x14)[0]
         projectile.position.y = np.ndarray((1,), ">f", event_bytes, 0x18)[0]
-        projectile.x = projectile.position.x
-        projectile.y = projectile.position.y
         projectile.speed.x = np.ndarray((1,), ">f", event_bytes, 0xc)[0]
         projectile.speed.y = np.ndarray((1,), ">f", event_bytes, 0x10)[0]
-        projectile.x_speed = projectile.speed.x
-        projectile.y_speed = projectile.speed.y
-        try:
-            projectile.owner = np.ndarray((1,), ">B", event_bytes, 0x2A)[0] + 1
-            if projectile.owner > 4:
-                projectile.owner = -1
-        except TypeError:
-            projectile.owner = -1
+
+        if self.slp_version >= '3.6.0':
+            # 0-3 for the player that owns the item. -1 when not owned
+            projectile.owner = np.ndarray((1,), ">b", event_bytes, 0x2A)[0] + 1
+
         try:
             projectile.type = enums.ProjectileType(np.ndarray((1,), ">H", event_bytes, 0x5)[0])
         except ValueError:
