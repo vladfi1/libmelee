@@ -157,7 +157,9 @@ _RANDALL_CORNER_POSITIONS = {
     1022: (-14.954894065856934, -103.46499633789062)
 }
 
-def randall_position(frame):
+RANDALL_INTERVAL = 1200
+
+def randall_position(frame: int) -> tuple[float, float, float]:
     """Gets the current position of Randall
 
     Args:
@@ -171,7 +173,7 @@ def randall_position(frame):
     Returns:
         (float, float, float): (height, x_left, x_right)
     """
-    frame_count = frame % 1200
+    frame_count = (frame + RANDALL_INTERVAL) % RANDALL_INTERVAL
     randall_width = 11.9
 
     # Top section
