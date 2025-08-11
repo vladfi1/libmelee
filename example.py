@@ -45,6 +45,7 @@ if __name__ == "__main__":
         slippi_address=args.address,
         logger=log,
         save_replays=args.debug,
+        fullscreen=False,
     )
 
     # Create our Controller object
@@ -103,7 +104,7 @@ if __name__ == "__main__":
     menu_helper = melee.MenuHelper()
 
     # Main loop
-    while True:
+    for _ in range(10 * 60):  # Run for 10 seconds
         # "step" to the next frame
         gamestate = console.step()
         if gamestate is None:
@@ -141,3 +142,5 @@ if __name__ == "__main__":
             # If we're not in game, don't log the frame
             if log:
                 log.skipframe()
+
+    console.stop()
