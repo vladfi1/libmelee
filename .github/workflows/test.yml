@@ -79,7 +79,9 @@ jobs:
           chmod +x Slippi_Online-x86_64-ExiAI.AppImage
 
       - name: Install dolphin dependencies
-        run: sudo apt install -y libfuse2 libegl1
+        run: |
+          sudo apt update
+          sudo apt install -y libfuse2 libegl1
 
       - name: Cache the SSBM iso
         if: matrix.os == 'ubuntu-latest'
