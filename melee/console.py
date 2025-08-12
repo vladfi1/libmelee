@@ -305,7 +305,7 @@ class Console:
         self._polling_mode = polling_mode
         self._polling_timeout = polling_timeout
         self.skip_rollback_frames = skip_rollback_frames
-        self.slp_version = "unknown"
+        self.slp_version: Optional[tuple[int, int, int]] = None
         """(str): The SLP version this stream/file currently is."""
         self._allow_old_version = allow_old_version
         self._use_manual_bookends = False
@@ -847,14 +847,16 @@ class Console:
         return False
 
     def __game_start(self, gamestate: GameState, event_bytes: bytes):
+        del gamestate  # unused
         self._frame = -10000
         major = np.ndarray((1,), ">B", event_bytes, 0x1)[0]
         minor = np.ndarray((1,), ">B", event_bytes, 0x2)[0]
         version_num = np.ndarray((1,), ">B", event_bytes, 0x3)[0]
-        self.slp_version = str(major) + "." + str(minor) + "." + str(version_num)
-        self._use_manual_bookends = self._allow_old_version and (version.parse(self.slp_version) < version.parse("3.0.0"))
+        self.slp_version_str = str(major) + "." + str(minor) + "." + str(version_num)
+        self.slp_version = (major, minor, version_num)
+        self._use_manual_bookends = self._allow_old_version and (self.slp_version < (3, 0, 0))
         if major < 3 and not self._allow_old_version:
-            raise SlippiVersionTooLow(self.slp_version)
+            raise SlippiVersionTooLow(self.slp_version_str)
         try:
             self._current_stage = enums.to_internal_stage(np.ndarray((1,), ">H", event_bytes, 0x13)[0])
         except ValueError:
@@ -875,9 +877,10 @@ class Console:
             if np.ndarray((1,), ">B", event_bytes, 0x66 + (0x24 * i))[0] != 1:
                 self._cpu_level[i] = 0
 
-        slp_version = (major, minor, version_num)
+        if self.slp_version >= (2, 0, 0):
+            self.is_frozen_ps = bool(np.ndarray((1,), ">B", event_bytes, 0x1A2)[0])
 
-        if slp_version >= (3, 9, 0):
+        if self.slp_version >= (3, 9, 0):
             shift_jis_hash = b'\x81\x94'.decode('shift-jis')
 
             for i in range(4):
@@ -1144,7 +1147,7 @@ class Console:
         projectile.speed.x = np.ndarray((1,), ">f", event_bytes, 0xc)[0]
         projectile.speed.y = np.ndarray((1,), ">f", event_bytes, 0x10)[0]
 
-        if self.slp_version >= '3.6.0':
+        if self.slp_version >= (3, 6, 0):
             # 0-3 for the player that owns the item. -1 when not owned
             projectile.owner = np.ndarray((1,), ">b", event_bytes, 0x2A)[0] + 1
 

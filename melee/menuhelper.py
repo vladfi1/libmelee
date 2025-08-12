@@ -17,6 +17,11 @@ class MenuHelper():
         self.name_tag_index: int = 0
         self.inputs_live: bool = False
 
+        # Logic for deciding whether to toggle Frozen Stadium.
+        # We need to only toggle once, otherwise we'll toggle it back.
+        self.frames_on_stage: int = 0
+        self.frozen_stadium_selected: bool = False
+
         # Whether the stage has already been selected.
         self.stage_selected: bool = False
 
@@ -31,6 +36,7 @@ class MenuHelper():
         costume: int = 0,
         autostart: bool = False,
         swag: bool = False,
+        frozen_stadium: bool = True,
     ):
         """Simplified menu helper function to get you through the menus and into a game
 
@@ -48,6 +54,8 @@ class MenuHelper():
             autostart (bool): Automatically start the game when it's ready.
                 Useful for BotvBot matches where no human is there to start it.
             swag (bool): What it sounds like
+            frozen_stadium (bool): Whether to use Frozen Stadium as the stage.
+                Only makes sense for Slippi >= 3.19.0.
         """
 
         # If we're at the character select screen, choose our character
@@ -78,7 +86,8 @@ class MenuHelper():
             self.choose_stage(stage=stage_selected,
                               gamestate=gamestate,
                               controller=controller,
-                              character=character_selected)
+                              character=character_selected,
+                              frozen_stadium=frozen_stadium)
         elif gamestate.menu_state == enums.Menu.MAIN_MENU:
             if connect_code:
                 self.choose_direct_online(gamestate=gamestate, controller=controller)
@@ -449,6 +458,7 @@ class MenuHelper():
         gamestate: GameState,
         controller: Controller,
         character: enums.Character,
+        frozen_stadium: bool = True,
     ):
         """Choose a stage from the stage select menu
 
@@ -458,7 +468,10 @@ class MenuHelper():
             stage (enums.Stage): The stage you want to select
             gamestate (gamestate.GameState): The current gamestate
             controller (controller.Controller): The controller object to press
+            frozen_stadium (bool): Whether to use Frozen Stadium as the stage.
         """
+        # TODO: why did I pick this as the condition to reset stage_selected?
+        # I should implement proper reset logic.
         if gamestate.frame == 0:
             self.stage_selected = False
 
@@ -516,8 +529,27 @@ class MenuHelper():
 
         #If we get in the right area, press A
         controller.tilt_analog(enums.Button.BUTTON_MAIN, 0.5, 0.5)
+        self.frames_on_stage += 1
+
+        # Empirically, it seems that we can toggle Frozen Stadium when the
+        # cursor is on any stage. So, we toggle at the first opportunity and
+        # leave it like that, whether or not we're currently selecting Stadium.
+        # This has the advantage of working even if we only pick Random.
+        if frozen_stadium != self.frozen_stadium_selected:
+            # Frame numbers here are probably quite loose.
+            if self.frames_on_stage == 30:
+                controller.press_button(enums.Button.BUTTON_Z)
+            elif self.frames_on_stage == 40:
+                controller.release_button(enums.Button.BUTTON_Z)
+
+            if self.frames_on_stage < 60:
+                return
+            else:
+                self.frozen_stadium_selected = frozen_stadium
+
         controller.press_button(enums.Button.BUTTON_A)
         self.stage_selected = True
+        self.frames_on_stage = 0
 
     def skip_postgame(self, controller: Controller):
         """ Spam the start button """
