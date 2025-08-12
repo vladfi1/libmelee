@@ -24,7 +24,7 @@ class SLPFile(unittest.TestCase):
                 self.assertEqual(framecount, 1039)
                 break
             if gamestate.frame == -123:
-                self.assertEqual(console.slp_version, "3.6.1")
+                self.assertEqual(console.slp_version, (3, 6, 1))
                 self.assertEqual(gamestate.players[1].character.value, 1)
                 self.assertEqual(gamestate.players[2].character.value, 1)
             if gamestate.frame == 297:
@@ -50,7 +50,7 @@ class SLPFile(unittest.TestCase):
                 self.assertEqual(framecount, 3840)
                 break
             if gamestate.frame == -123:
-                self.assertEqual(console.slp_version, "2.0.1")
+                self.assertEqual(console.slp_version, (2, 0, 1))
                 self.assertEqual(gamestate.players[2].character.value, 3)
                 self.assertEqual(gamestate.players[3].character.value, 18)
             if gamestate.frame == 301:

@@ -62,6 +62,9 @@ class DolphinTest(unittest.TestCase):
             first_frame = True
             while True:
                 gamestate = console.step()
+                self.assertIsNotNone(gamestate)
+                assert gamestate is not None  # For pylance
+
                 if first_frame:
                     self.assertEqual(gamestate.frame, 0)
                     first_frame = False
@@ -107,6 +110,9 @@ class DolphinTest(unittest.TestCase):
             first_frame = True
             while True:
                 gamestate = console.step()
+                self.assertIsNotNone(gamestate)
+                assert gamestate is not None  # For pylance
+
                 if first_frame:
                     self.assertEqual(gamestate.frame, 0)
                     first_frame = False
