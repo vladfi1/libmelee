@@ -1,2 +1,2 @@
-""" Version of libmelee """
-__version__ = '0.38.1'
+"""Version of libmelee """
+__version__ = '0.39.0'
