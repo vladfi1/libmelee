@@ -217,7 +217,7 @@ class MenuHelper():
         else:
             ai_state = gamestate.players[controlling_port]
 
-        cursor_x, cursor_y = ai_state.cursor_x, ai_state.cursor_y
+        cursor_x, cursor_y = ai_state.cursor.x, ai_state.cursor.y
         coin_down = ai_state.coin_down
         character_selected = ai_state.character
 
@@ -338,12 +338,12 @@ class MenuHelper():
             return
 
         # We are already set, so let's taunt our opponent
-        if correct_character and swag and not start:
+        if correct_character and swag and opponent_state and not start:
             delta_x = 3 * math.cos(gamestate.frame / 1.5)
             delta_y = 3 * math.sin(gamestate.frame / 1.5)
 
-            target_x = opponent_state.cursor_x + delta_x
-            target_y = opponent_state.cursor_y + delta_y
+            target_x = opponent_state.cursor.x + delta_x
+            target_y = opponent_state.cursor.y + delta_y
 
             diff_x = abs(target_x - cursor_x)
             diff_y = abs(target_y - cursor_y)
@@ -573,7 +573,8 @@ class MenuHelper():
             in Melee, if a controller is plugged in, only that player can make the status
             go to uplugged. If you've ever played Melee, you probably know this. If your
             friend walks away, you have to press the A button on THEIR controller. (or
-            else actually unplug the controller) No way around it."""
+            else actually unplug the controller) No way around it.
+        """
         ai_state = gamestate.players[controller.port]
         target_x, target_y = 0, -2.2
         if targetport == 1:
@@ -595,19 +596,19 @@ class MenuHelper():
             return
 
         #Move up if we're too low
-        if ai_state.cursor_y < target_y - wiggleroom:
+        if ai_state.cursor.y < target_y - wiggleroom:
             controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, 1)
             return
         #Move downn if we're too high
-        if ai_state.cursor_y > target_y + wiggleroom:
+        if ai_state.cursor.y > target_y + wiggleroom:
             controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, 0)
             return
         #Move right if we're too left
-        if ai_state.cursor_x < target_x - wiggleroom:
+        if ai_state.cursor.x < target_x - wiggleroom:
             controller.tilt_analog(enums.Button.BUTTON_MAIN, 1, .5)
             return
         #Move left if we're too right
-        if ai_state.cursor_x > target_x + wiggleroom:
+        if ai_state.cursor.x > target_x + wiggleroom:
             controller.tilt_analog(enums.Button.BUTTON_MAIN, 0, .5)
             return
 

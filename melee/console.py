@@ -965,9 +965,6 @@ class Console:
         playerstate.position.x = np.ndarray((1,), ">f", event_bytes, 0xa)[0]
         playerstate.position.y = np.ndarray((1,), ">f", event_bytes, 0xe)[0]
 
-        playerstate.x = playerstate.position.x
-        playerstate.y = playerstate.position.y
-
         playerstate.character = enums.Character(np.ndarray((1,), ">B", event_bytes, 0x7)[0])
         try:
             playerstate.action = enums.Action(np.ndarray((1,), ">H", event_bytes, 0x8)[0])
@@ -1051,7 +1048,7 @@ class Console:
         # "off_stage" helper
         try:
             if (abs(playerstate.position.x) > stages.EDGE_GROUND_POSITION[gamestate.stage] or \
-                    playerstate.y < -6) and not playerstate.on_ground:
+                    playerstate.position.y < -6) and not playerstate.on_ground:
                 playerstate.off_stage = True
             else:
                 playerstate.off_stage = False
@@ -1219,14 +1216,14 @@ class Console:
             gamestate.players[4].controller_status = enums.ControllerStatus(np.ndarray((1,), ">B", event_bytes, 0x28)[0])
 
             # CSS Cursors
-            gamestate.players[1].cursor_x = np.ndarray((1,), ">f", event_bytes, 0x3)[0]
-            gamestate.players[1].cursor_y = np.ndarray((1,), ">f", event_bytes, 0x7)[0]
-            gamestate.players[2].cursor_x = np.ndarray((1,), ">f", event_bytes, 0xB)[0]
-            gamestate.players[2].cursor_y = np.ndarray((1,), ">f", event_bytes, 0xF)[0]
-            gamestate.players[3].cursor_x = np.ndarray((1,), ">f", event_bytes, 0x13)[0]
-            gamestate.players[3].cursor_y = np.ndarray((1,), ">f", event_bytes, 0x17)[0]
-            gamestate.players[4].cursor_x = np.ndarray((1,), ">f", event_bytes, 0x1B)[0]
-            gamestate.players[4].cursor_y = np.ndarray((1,), ">f", event_bytes, 0x1F)[0]
+            gamestate.players[1].cursor.x = np.ndarray((1,), ">f", event_bytes, 0x3)[0]
+            gamestate.players[1].cursor.y = np.ndarray((1,), ">f", event_bytes, 0x7)[0]
+            gamestate.players[2].cursor.x = np.ndarray((1,), ">f", event_bytes, 0xB)[0]
+            gamestate.players[2].cursor.y = np.ndarray((1,), ">f", event_bytes, 0xF)[0]
+            gamestate.players[3].cursor.x = np.ndarray((1,), ">f", event_bytes, 0x13)[0]
+            gamestate.players[3].cursor.y = np.ndarray((1,), ">f", event_bytes, 0x17)[0]
+            gamestate.players[4].cursor.x = np.ndarray((1,), ">f", event_bytes, 0x1B)[0]
+            gamestate.players[4].cursor.y = np.ndarray((1,), ">f", event_bytes, 0x1F)[0]
 
             # Ready to fight banner
             gamestate.ready_to_start = np.ndarray((1,), ">B", event_bytes, 0x23)[0]
@@ -1287,8 +1284,6 @@ class Console:
             for player in gamestate.players.values():
                 player.cursor.x = np.ndarray((1,), ">f", event_bytes, 0x31)[0]
                 player.cursor.y = np.ndarray((1,), ">f", event_bytes, 0x35)[0]
-                gamestate.stage_select_cursor_x = player.cursor.x
-                gamestate.stage_select_cursor_y = player.cursor.y
 
         # Frame count
         gamestate.frame = np.ndarray((1,), ">i", event_bytes, 0x39)[0]
