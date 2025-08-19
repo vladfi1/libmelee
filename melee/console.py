@@ -294,6 +294,7 @@ class Console:
                  use_exi_inputs=False,
                  enable_ffw=False,
                  dump_config: Optional[DumpConfig] = None,
+                 debug: bool = False,
                 ):
         """Create a Console object
 
@@ -399,6 +400,7 @@ class Console:
             raise ValueError("Must use exi inputs to enable ffw mode.")
         self.enable_ffw = enable_ffw
         self.dump_config = dump_config
+        self.debug = debug
 
         # Keep a running copy of the last gamestate produced
         self._prev_gamestate = GameState()
@@ -840,8 +842,15 @@ class Console:
             try:
                 event_type = EventType(command_byte)
             except ValueError:
-                logging.error("Got invalid event type: %s", command_byte)
-                import ipdb; ipdb.set_trace()
+                logging.error("Got unknown event type: %s", command_byte)
+                if self.debug:
+                    import ipdb; ipdb.set_trace()
+
+                if command_byte >= len(self.eventsize):
+                    raise ValueError("Command byte %s is invalid.", command_byte)
+
+                event_bytes = event_bytes[self.eventsize[command_byte]:]
+                continue
 
             if event_type == EventType.MENU_EVENT:
                 # https://github.com/project-slippi/dolphin/issues/31
