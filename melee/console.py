@@ -27,8 +27,9 @@ import tempfile
 
 from melee import enums
 from melee.enums import Action
+import melee.gamestate as gamestate_lib
 from melee.gamestate import GameState, Projectile, PlayerState
-from melee.slippstream import SlippstreamClient, EventType, EVENT_TO_STAGE
+from melee.slippstream import SlippstreamClient, EventType
 from melee.slpfilestreamer import SLPFileStreamer
 from melee import stages
 
@@ -380,6 +381,11 @@ class Console:
         self._is_teams = False
         self._display_names: dict[int, str] = {}
         self._connect_codes: dict[int, str] = {}
+
+        # Stage-specific state tracking
+        self._fod_platforms: Optional[gamestate_lib.FoDPlatforms] = None
+        self._whispy: Optional[gamestate_lib.WhispyBlowDirection] = None
+        self._stadium_transformation: Optional[gamestate_lib.StadiumTransformation] = None
 
         self.setup_gecko_codes = setup_gecko_codes
         self.online_delay = online_delay
@@ -762,11 +768,12 @@ class Console:
         with open(dolphin_config_path, 'w') as dolphinfile:
             config.write(dolphinfile)
 
-    def step(self):
+    def step(self) -> Optional[GameState]:
         """ 'step' to the next state of the game and flushes all controllers
 
         Returns:
-            GameState object that represents new current state of the game"""
+            GameState object that represents new current state of the game.
+        """
         self.processingtime = time.time() - self._frametimestamp
 
         # Flush the controllers
@@ -806,8 +813,19 @@ class Console:
 
         gamestate = self._temp_gamestate
         self._temp_gamestate = None
+
         self.__fixframeindexing(gamestate)
         self.__fixiasa(gamestate)
+
+        # Copy stage-specific attributes into the gamestate
+        # TODO: make copies to avoid accidental mutation
+        if self._current_stage is enums.Stage.FOUNTAIN_OF_DREAMS:
+            gamestate.fod_platforms = self._fod_platforms
+        elif self._current_stage is enums.Stage.DREAMLAND:
+            gamestate.whispy = self._whispy
+        elif self._current_stage is enums.Stage.POKEMON_STADIUM:
+            gamestate.stadium_transformation = self._stadium_transformation
+
         # Insert some metadata into the gamestate
         gamestate.playedOn = self._slippstream.playedOn
         gamestate.startAt = self._slippstream.timestamp
@@ -875,12 +893,13 @@ class Console:
                 logging.warning("Something went wrong unpacking events. Data is probably missing")
                 return False
 
+            # Big switch over event_type
+
             if event_type == EventType.FRAME_START:
-                event_bytes = event_bytes[event_size:]
+                pass
 
             elif event_type == EventType.GAME_START:
                 self.__game_start(gamestate, event_bytes)
-                event_bytes = event_bytes[event_size:]
                 # The game needs to know what to press on the first frame of the game
                 #   Just give it empty input. Characters are not actionable anyway.
                 for controller in self.controllers:
@@ -888,23 +907,25 @@ class Console:
                     controller.flush()
 
             elif event_type == EventType.GAME_END:
-                event_bytes = event_bytes[event_size:]
                 return self._use_manual_bookends
 
             elif event_type == EventType.PRE_FRAME:
                 self.__pre_frame(gamestate, event_bytes)
-                event_bytes = event_bytes[event_size:]
 
             elif event_type == EventType.POST_FRAME:
                 self.__post_frame(gamestate, event_bytes)
-                event_bytes = event_bytes[event_size:]
 
             elif event_type == EventType.GECKO_CODES:
-                event_bytes = event_bytes[event_size:]
+                pass
 
             elif event_type == EventType.FRAME_BOOKEND:
                 self.__frame_bookend(gamestate, event_bytes)
-                event_bytes = event_bytes[event_size:]
+
+                # We always return on a frame bookend, but that might leave
+                # some data unprocessed; what should we do in that case?
+                if len(event_bytes) > event_size:
+                    logging.warning("Unprocessed data left after frame bookend.")
+
                 # If this is an old frame, then don't return it.
                 if gamestate.frame <= self._frame and self.skip_rollback_frames:
                     # In blocking mode we still need to flush the controllers
@@ -918,20 +939,22 @@ class Console:
 
             elif event_type == EventType.ITEM_UPDATE:
                 self.__item_update(gamestate, event_bytes)
-                event_bytes = event_bytes[event_size:]
 
-            elif event_type in [EventType.FOD_INFO, EventType.DL_INFO, EventType.PS_INFO]:
-                # TODO: Handle these events
-                event_bytes = event_bytes[event_size:]
+            elif event_type == EventType.FOD_INFO:
+                self.__fod_platforms(gamestate, event_bytes)
 
-                expected_stage = EVENT_TO_STAGE[event_type]
+            elif event_type == EventType.DL_INFO:
+                self.__whispy_blow(gamestate, event_bytes)
 
-                if self._current_stage is not expected_stage:
-                    logging.warning("Got stage info for %s, but gamestate says %s", expected_stage, gamestate.stage)
+            elif event_type == EventType.PS_INFO:
+                self.__stadium_transformation(gamestate, event_bytes)
 
             else:
                 logging.error("Got an unhandled event type: %s", event_type)
                 return False
+
+            event_bytes = event_bytes[event_size:]
+
         return False
 
     def __game_start(self, gamestate: GameState, event_bytes: bytes):
@@ -942,13 +965,22 @@ class Console:
         version_num = np.ndarray((1,), ">B", event_bytes, 0x3)[0]
         self.slp_version = str(major) + "." + str(minor) + "." + str(version_num)
         self.slp_version_tuple = (major, minor, version_num)
-        self._use_manual_bookends = self._allow_old_version and (self.slp_version_tuple < (3, 0, 0))
+        self._use_manual_bookends = self._allow_old_version and major < 3
         if major < 3 and not self._allow_old_version:
             raise SlippiVersionTooLow(self.slp_version)
         try:
-            self._current_stage = enums.to_internal_stage(np.ndarray((1,), ">H", event_bytes, 0x13)[0])
+            self._current_stage = enums.to_internal_stage(
+                np.ndarray((1,), ">H", event_bytes, 0x13)[0])
         except ValueError:
             self._current_stage = enums.Stage.NO_STAGE
+
+        if self.slp_version_tuple >= (3, 18, 0):
+            if self._current_stage is enums.Stage.FOUNTAIN_OF_DREAMS:
+                self._fod_platforms = gamestate_lib.FoDPlatforms()
+            elif self._current_stage is enums.Stage.DREAMLAND:
+                self._whispy = gamestate_lib.WhispyBlowDirection.NONE
+            elif self._current_stage is enums.Stage.POKEMON_STADIUM:
+                self._stadium_transformation = gamestate_lib.StadiumTransformation()
 
         self._is_teams = not (np.ndarray((1,), ">H", event_bytes, 0xD)[0] == 0)
 
@@ -1209,7 +1241,7 @@ class Console:
         if self._use_manual_bookends:
             self._frame = gamestate.frame
 
-    def __frame_bookend(self, gamestate, event_bytes):
+    def __frame_bookend(self, gamestate: GameState, event_bytes: bytes):
         self._prev_gamestate = gamestate
         # Calculate helper distance variable
         #   This is a bit kludgey.... :/
@@ -1431,6 +1463,37 @@ class Console:
         for port in gamestate.players:
             if gamestate.players[port].controller_status != enums.ControllerStatus.CONTROLLER_CPU:
                 gamestate.players[port].cpu_level = 0
+
+    def __fod_platforms(self, gamestate: GameState, event_bytes: bytes):
+        if self._fod_platforms is None:
+            raise ValueError("Fountain of Dreams platforms not initialized")
+
+        platform = np.ndarray((1,), ">B", event_bytes, 0x5)[0]
+        height = np.ndarray((1,), ">f", event_bytes, 0x6)[0]
+
+        if platform == 0:
+            self._fod_platforms.right = height
+        elif platform == 1:
+            self._fod_platforms.left = height
+        else:
+            raise ValueError("Unknown FoD platform type: {}".format(platform))
+
+    def __whispy_blow(self, gamestate: GameState, event_bytes: bytes):
+        if self._whispy is None:
+            raise ValueError("Whispy not initialized")
+
+        direction = np.ndarray((1,), ">B", event_bytes, 0x5)[0]
+        self._whispy = gamestate_lib.WhispyBlowDirection(direction)
+
+    def __stadium_transformation(self, gamestate: GameState, event_bytes: bytes):
+        if self._stadium_transformation is None:
+            raise ValueError("Stadium transformations not initialized")
+
+        self._stadium_transformation.event = gamestate_lib.StadiumTransformationEvent(
+            np.ndarray((1,), ">H", event_bytes, 0x5)[0])
+
+        self._stadium_transformation.type = gamestate_lib.StadiumTransformationType(
+            np.ndarray((1,), ">H", event_bytes, 0x7)[0])
 
     def __fixframeindexing(self, gamestate: GameState):
         """ Melee's indexing of action frames is wildly inconsistent.

@@ -38,11 +38,6 @@ class EventType(Enum):
     # Due to a bug, dolphin sometimes sends these before the game has ended.
     MENU_EVENT = 0x3e
 
-EVENT_TO_STAGE = {
-    EventType.FOD_INFO: Stage.FOUNTAIN_OF_DREAMS,
-    EventType.DL_INFO: Stage.DREAMLAND,
-    EventType.PS_INFO: Stage.POKEMON_STADIUM,
-}
 
 class CommType(Enum):
     """ Types of SlippiComm messages """

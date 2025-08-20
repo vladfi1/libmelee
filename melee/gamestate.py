@@ -2,6 +2,7 @@
         to make gameplay decisions
 """
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Optional
 
 import numpy as np
@@ -27,12 +28,55 @@ class ECB:
     right: Position = field(default_factory=Position)
 
 @dataclass
+class FoDPlatforms:
+    """Dataclass for the platforms on the Fountain of Dreams stage."""
+    # Initial values are the same each time, found by experimentation and
+    # extrapolating backwards after the platforms start moving.
+    left: np.float32 = np.float32(20)
+    right: np.float32 = np.float32(28)
+
+class WhispyBlowDirection(Enum):
+    NONE = np.uint8(0)
+    LEFT = np.uint8(1)
+    RIGHT = np.uint8(2)
+
+# https://github.com/project-slippi/slippi-wiki/blob/master/SPEC.md#stadium-transformations
+class StadiumTransformationEvent(Enum):
+    """Pokemon Stadium transformation event types"""
+    FINISHED = 0
+    INITIALIZE = 2
+    ON_MONITOR = 3
+    PREVIOUS_RECEDING = 4
+    NEW_RISING = 5
+    FINALIZE = 6
+
+class StadiumTransformationType(Enum):
+    """Pokemon Stadium transformation types"""
+    FIRE = 3
+    GRASS = 4
+    NORMAL = 5
+    ROCK = 6
+    WATER = 9
+
+@dataclass
+class StadiumTransformation:
+    """Current Pokemon Stadium transformation state"""
+    event: StadiumTransformationEvent = StadiumTransformationEvent.FINISHED
+    type: StadiumTransformationType = StadiumTransformationType.NORMAL
+
+@dataclass
 class GameState:
     """Represents the state of a running game of Melee at a given moment in time"""
     frame: int = -10000
     """int: The current frame number. Monotonically increases. Can be negative."""
     stage: enums.Stage = enums.Stage.FINAL_DESTINATION
     """enums.Stage: The current stage being played on"""
+
+    # Stage-specific state
+    whispy: Optional[WhispyBlowDirection] = None
+    fod_platforms: Optional[FoDPlatforms] = None
+    stadium_transformation: Optional[StadiumTransformation] = None
+
     menu_state: enums.Menu = enums.Menu.IN_GAME
     """enums.MenuState: The current menu scene, such as IN_GAME, or STAGE_SELECT"""
     submenu: enums.SubMenu = enums.SubMenu.UNKNOWN_SUBMENU
