@@ -54,6 +54,35 @@ def _ignore_fifos(src, names):
 def _copytree_safe(src, dst):
     shutil.copytree(src, dst, ignore=_ignore_fifos)
 
+def default_dolphin_install_path() -> str:
+    os_name = platform.system()
+    home = os.path.expanduser("~")
+
+    if os_name == "Windows":
+        path = os.path.join(
+            home, 'AppData', 'Roaming', 'Slippi Launcher', 'netplay')
+        if not os.path.isdir(path):
+            raise FileNotFoundError("Could not find dolphin install directory.")
+        return path
+
+    elif os_name == "Darwin":
+        slippi_launcher = os.path.join(
+            home, 'Library', 'Application Support', 'Slippi Launcher')
+        options = [
+            'netplay/Slippi Dolphin.app',
+            'netplay-beta/Slippi_Dolphin.app',
+        ]
+        for option in options:
+            path = os.path.join(slippi_launcher, option)
+            if os.path.isdir(path):
+                return path
+        raise FileNotFoundError("Could not find dolphin install directory.")
+
+    elif os_name == "Linux":
+        raise NotImplementedError("Manually specify the dolphin path.")
+
+    raise NotImplementedError(f"Unsupported OS '{os_name}'")
+
 def _default_home_path(path: str) -> str:
     if platform.system() == "Darwin":
         return path + "/Contents/Resources/User/"
@@ -90,6 +119,7 @@ def get_exe_path(path: str) -> str:
     if platform.system() == "Windows":
         exe_name = "Slippi Dolphin.exe"
     elif platform.system() == "Darwin":
+        # TODO: exe name varies between Ishiiruka and mainline
         exe_name = "Slippi Dolphin"
     else: # Linux
         exe_name = "dolphin-emu"
@@ -218,6 +248,7 @@ class Console:
     def __init__(self,
                  path: Optional[str] = None,
                  is_dolphin: bool = True,
+                 is_remote: bool = False,
                  dolphin_home_path: Optional[str] = None,
                  tmp_home_directory: bool = True,
                  copy_home_directory: bool = False,
@@ -250,10 +281,9 @@ class Console:
 
         Args:
             path (str): Path to the directory where your dolphin executable is located.
-                If None, will assume the dolphin is remote and won't try to configure it.
             dolphin_home_path (str): Path to dolphin user directory. Optional.
             is_dolphin (bool): Is this console a dophin instance, or SLP file?
-            is_mainline (bool): Is this mainline dolphin or Ishiiruka slippi?
+            is_remote (bool): Is this console a remote instance?
             tmp_home_directory (bool): Use a temporary directory for the dolphin User path
                 This is useful so instances don't interfere with each other.
             copy_home_directory (bool): Copy an existing home directory on the system.
@@ -365,8 +395,16 @@ class Console:
         self._process = None
         if self.is_dolphin:
             self._slippstream = SlippstreamClient(self.slippi_address, self.slippi_port)
-            if self.path:
-                self.dolphin_version = get_dolphin_version(path)
+
+            if is_remote:
+                if path:
+                    raise ValueError("path specified for remote connection")
+            else:
+                if not self.path:
+                    self.path = default_dolphin_install_path()
+
+                self.exe_path = get_exe_path(self.path)
+                self.dolphin_version = get_dolphin_version(self.exe_path)
                 self.is_mainline = self.dolphin_version.mainline
 
                 if gfx_backend == 'Null':
@@ -468,8 +506,7 @@ class Console:
         """
         assert self.is_dolphin and self.path
 
-        exe_path = get_exe_path(self.path)
-        command = [exe_path]
+        command = [self.exe_path]
 
         if iso_path is not None:
             command.append("-e")
