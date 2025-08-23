@@ -117,12 +117,34 @@ class DolphinVersion:
 
 def get_dolphin_version(path: str) -> DolphinVersion:
     exe_path = get_exe_path(path)
-    result = subprocess.run([exe_path, '--version'], capture_output=True)
+
+    result = subprocess.run(
+        [exe_path, '--version'],
+        capture_output=True, text=True)
+
+    if platform.system() == 'Windows':
+        if result.returncode == 0:
+            return DolphinVersion(
+                mainline=True,
+                # On Windows, mainline returns the correct version, but
+                # somehow avoids getting output captured, probably because it
+                # uses "WriteConsole"?
+                version='unknown',
+                build=DolphinBuild.NETPLAY,
+            )
+
+        # Ishiiruka gives returncode 2 ** 32 - 1 = 4294967295, but still uses stdout...
+        assert result.returncode == 2 ** 32 - 1
+        return DolphinVersion(
+            mainline=False,
+            version=result.stdout.strip(),
+            build=DolphinBuild.NETPLAY,
+        )
 
     # Ishiiruka actually gives returncode 1 and puts
     # "Faster Melee - Slippi (3.4.0)" in stderr!
     output = result.stdout if result.returncode == 0 else result.stderr
-    output = output.decode().strip()
+    output = output.strip()
 
     # Mainline versions look like "4.0.0-mainline-beta.4"
     if output.find('mainline') != -1:
@@ -141,7 +163,7 @@ def get_dolphin_version(path: str) -> DolphinVersion:
         assert result.returncode == 255
         return DolphinVersion(
             mainline=False,
-            version=result.stdout.decode().strip(),
+            version=output,
             build=DolphinBuild.NETPLAY,
         )
 
