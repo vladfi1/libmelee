@@ -84,6 +84,10 @@ def default_dolphin_install_path() -> str:
     raise NotImplementedError(f"Unsupported OS '{os_name}'")
 
 def _default_home_path(path: str) -> str:
+    if os.path.isfile(path):
+        raise NotImplementedError(
+            "Must specify dolphin install directory, not executable.")
+
     if platform.system() == "Darwin":
         return path + "/Contents/Resources/User/"
 
@@ -330,12 +334,6 @@ class Console:
         self.path = path
         self.dolphin_home_path = dolphin_home_path
         self.temp_dir = None
-        if tmp_home_directory and self.is_dolphin:
-            self.temp_dir = tempfile.mkdtemp(prefix='libmelee_')
-            home_dir = self.temp_dir + "/User/"
-            if copy_home_directory:
-                _copytree_safe(self._get_dolphin_home_path(), home_dir)
-            self.dolphin_home_path = home_dir
 
         self.processingtime = 0
         self._frametimestamp = time.time()
@@ -393,6 +391,7 @@ class Console:
         # Half-completed gamestate not yet ready to add to the list
         self._temp_gamestate = None
         self._process = None
+
         if self.is_dolphin:
             self._slippstream = SlippstreamClient(self.slippi_address, self.slippi_port)
 
@@ -402,6 +401,13 @@ class Console:
             else:
                 if not self.path:
                     self.path = default_dolphin_install_path()
+
+                if tmp_home_directory:
+                    self.temp_dir = tempfile.mkdtemp(prefix='libmelee_')
+                    home_dir = os.path.join(self.temp_dir, "User")
+                    if copy_home_directory:
+                        _copytree_safe(self._get_dolphin_home_path(), home_dir)
+                    self.dolphin_home_path = home_dir
 
                 self.exe_path = get_exe_path(self.path)
                 self.dolphin_version = get_dolphin_version(self.exe_path)
@@ -465,7 +471,7 @@ class Console:
             return self.dolphin_home_path
 
         assert self.path, "Must specify a dolphin path."
-
+        # TODO: this method doesn't work if self.path points the executable
         return _default_home_path(self.path)
 
     def _get_dolphin_config_path(self):
