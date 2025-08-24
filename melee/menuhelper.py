@@ -83,6 +83,8 @@ class MenuHelper():
             self.skip_postgame(controller=controller)
         # If we're at the stage select screen, choose a stage
         elif gamestate.menu_state == enums.Menu.STAGE_SELECT:
+            if not autostart:
+                return
             self.choose_stage(stage=stage_selected,
                               gamestate=gamestate,
                               controller=controller,
