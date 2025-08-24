@@ -676,6 +676,7 @@ class Action(Enum):
     KIRBY_STONE_UNFORMING = 0x18D
     UNKNOWN_ANIMATION = 0xffff
 
+# Complete list at: https://docs.google.com/spreadsheets/d/1JX2w-r2fuvWuNgGb6D3Cs4wHQKLFegZe2jhbBuIhCG8/edit?gid=20#gid=20
 class ProjectileType(Enum):
     """Primary type of prejectile or item """
     BOB_OMB = 0x06 # Bob-omb (BombHei)
@@ -705,10 +706,13 @@ class ProjectileType(Enum):
     PK_THUNDER_TAIL_2 = 0x47 # PK Thunder
     PK_THUNDER_TAIL_3 = 0x48 # PK Thunder
     PK_THUNDER_TAIL_4 = 0x49 # PK Thunder
+    FOX_BLASTER = 0x4A # Fox's Blaster
+    FALCO_BLASTER = 0x4B # Falco's Blaster
     LINK_ARROW = 0x4C # Link's Arrow
     YLINK_ARROW = 0x4D # Young Link's arrow
     PK_FLASH_EXPLOSION = 0x4E # PK Flash (explosion)
     NEEDLE_THROWN = 0x4F # Needle(thrown)
+    NEEDLE = 0x50 # Needle
     PIKACHU_THUNDER = 0x51 # Pikachu's Thunder
     PICHU_THUNDER = 0x52 # Pichu's Thunder
     MARIO_CAPE = 0x53 # Mario's cape
@@ -726,11 +730,13 @@ class ProjectileType(Enum):
     SAMUS_MISSLE = 0x5F # Missile
     SAMUS_GRAPPLE_BEAM = 0x60 # Grapple beam
     SHEIK_CHAIN = 0x61 # Sheik's chain
+    PEACH_BOMBER = 0x62 # Peach's Side-B
     TURNIP = 0x63 # Turnip
     BOWSER_FLAME = 0x64 # Bowser's flame
     NESS_BATT = 0x65 # Ness's bat
     NESS_YOYO = 0x66 # Yoyo
     PEACH_PARASOL = 0x67 # Peach's parasol
+    PEACH_TOAD = 0x68 # Peach's Toad
     LUIGI_FIRE = 0x69 # Luigi's fire
     ICE_BLOCK = 0x6A # Ice(Iceclimbers)
     IC_BLIZZARD = 0x6B # Blizzard
@@ -774,4 +780,5 @@ class ProjectileType(Enum):
     KIRBY_BOWSER_FLAME = 0x9A # Kirby copy Bowser's Flame (B)
     KIRBY_SAUSAGE = 0x9B # Kirby copy Mr. Game & Watch's Sausage (B)
     KIRBY_YOSHI_TONGUE = 0x9D # Yoshi's Tongue?? (B)
+    SHY_GUY = 0xD2
     UNKNOWN_PROJECTILE = 0xff
