@@ -1258,37 +1258,42 @@ class Console:
         gamestate.distance = math.sqrt((xdist**2) + (ydist**2))
 
     def __item_update(self, gamestate: GameState, event_bytes: bytes):
+        assert np.ndarray((1,), ">i", event_bytes, 0x1)[0] == gamestate.frame
+
         projectile = Projectile()
         projectile.position.x = np.ndarray((1,), ">f", event_bytes, 0x14)[0]
         projectile.position.y = np.ndarray((1,), ">f", event_bytes, 0x18)[0]
         projectile.speed.x = np.ndarray((1,), ">f", event_bytes, 0xc)[0]
         projectile.speed.y = np.ndarray((1,), ">f", event_bytes, 0x10)[0]
 
+        raw_projectile_type = np.ndarray((1,), ">H", event_bytes, 0x5)[0]
+        try:
+            projectile.type = enums.ProjectileType(raw_projectile_type)
+        except ValueError:
+            projectile.type = gamestate_lib.UnknownProjectileType(raw_projectile_type)
+
+        projectile.expiration_frames = int(np.ndarray((1,), ">f", event_bytes, 0x1E)[0])
+
+        projectile.subtype = np.ndarray((1,), ">B", event_bytes, 0x7)[0]
+
+        # # Ignore exploded Samus bombs. They are subtype 3
+        # if projectile.type == enums.ProjectileType.SAMUS_BOMB and projectile.subtype == 3:
+        #     return
+        # # Ignore exploded Samus missles
+        # if projectile.type == enums.ProjectileType.SAMUS_MISSLE and projectile.subtype in [2, 3]:
+        #     return
+        # # Ignore Samus charge beam while charging (not firing)
+        # if projectile.type == enums.ProjectileType.SAMUS_CHARGE_BEAM and projectile.subtype == 0:
+        #     return
+
+        projectile.spawn_id = np.ndarray((1,), ">I", event_bytes, 0x22)[0]
+
         if self.slp_version_tuple >= (3, 6, 0):
             # 0-3 for the player that owns the item. -1 when not owned
             projectile.owner = np.ndarray((1,), ">b", event_bytes, 0x2A)[0] + 1
 
-        try:
-            projectile.type = enums.ProjectileType(np.ndarray((1,), ">H", event_bytes, 0x5)[0])
-        except ValueError:
-            projectile.type = enums.ProjectileType.UNKNOWN_PROJECTILE
-
-        try:
-            projectile.frame = int(np.ndarray((1,), ">f", event_bytes, 0x1E)[0])
-        except ValueError:
-            projectile.frame = -1
-
-        projectile.subtype = np.ndarray((1,), ">B", event_bytes, 0x7)[0]
-
-        # Ignore exploded Samus bombs. They are subtype 3
-        if projectile.type == enums.ProjectileType.SAMUS_BOMB and projectile.subtype == 3:
-            return
-        # Ignore exploded Samus missles
-        if projectile.type == enums.ProjectileType.SAMUS_MISSLE and projectile.subtype in [2, 3]:
-            return
-        # Ignore Samus charge beam while charging (not firing)
-        if projectile.type == enums.ProjectileType.SAMUS_CHARGE_BEAM and projectile.subtype == 0:
-            return
+        if len(gamestate.projectiles) >= 15:
+            logging.error("More than 15 projectiles. Something is probably wrong.")
 
         # Add the projectile to the gamestate list
         gamestate.projectiles.append(projectile)

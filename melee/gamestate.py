@@ -10,7 +10,7 @@ import numpy as np
 import melee
 from melee import enums
 
-@dataclass
+@dataclass(slots=True, unsafe_hash=True)
 class Position:
     """Dataclass for position types. Has (x, y) coords."""
     x: np.float32 = np.float32(0)
@@ -19,7 +19,7 @@ class Position:
 Speed = Position
 Cursor = Position
 
-@dataclass
+@dataclass(slots=True)
 class ECB:
     """ECBs (Environmental collision box) info. It's a diamond with four points that define it."""
     top: Position = field(default_factory=Position)
@@ -27,7 +27,7 @@ class ECB:
     left: Position = field(default_factory=Position)
     right: Position = field(default_factory=Position)
 
-@dataclass
+@dataclass(slots=True)
 class FoDPlatforms:
     """Dataclass for the platforms on the Fountain of Dreams stage."""
     # Initial values are the same each time, found by experimentation and
@@ -58,13 +58,13 @@ class StadiumTransformationType(Enum):
     ROCK = 6
     WATER = 9
 
-@dataclass
+@dataclass(slots=True)
 class StadiumTransformation:
     """Current Pokemon Stadium transformation state"""
     event: StadiumTransformationEvent = StadiumTransformationEvent.FINISHED
     type: StadiumTransformationType = StadiumTransformationType.NORMAL
 
-@dataclass
+@dataclass(slots=True)
 class GameState:
     """Represents the state of a running game of Melee at a given moment in time"""
     frame: int = -10000
@@ -83,7 +83,7 @@ class GameState:
     """(enums.SubMenu): The current sub-menu"""
     players: dict[int, 'PlayerState'] = field(default_factory=dict)
     """(dict of int - gamestate.PlayerState): Dict of PlayerState objects. Key is controller port"""
-    projectiles: list = field(default_factory=list)
+    projectiles: list['Projectile'] = field(default_factory=list)
     """(list of Projectile): All projectiles (items) currently existing"""
     ready_to_start: bool = False
     """(bool): Is the 'ready to start' banner showing at the character select screen?"""
@@ -103,7 +103,7 @@ class GameState:
     custom: dict = field(default_factory=dict)
     """(dict): Custom fields to be added by the user"""
 
-@dataclass
+@dataclass(slots=True)
 class PlayerState:
     """ Represents the state of a single player """
     # This value is what the character currently is IN GAME
@@ -195,21 +195,28 @@ class PlayerState:
     team_id: int = 0
     """(int): The team ID of the player. This is different than costume, and only relevant during teams."""
 
-@dataclass
+@dataclass(slots=True)
+class UnknownProjectileType:
+    """ Represents an unknown projectile type """
+    value: np.uint16
+
+@dataclass(slots=True, unsafe_hash=True)
 class Projectile:
     """ Represents the state of a projectile (items, lasers, etc...) """
+    # frame: int = 0
     position: Position = field(default_factory=Position)
     """(Position): x, y projectile position"""
     speed: Speed = field(default_factory=Speed)
     """(Position): x, y projectile speed"""
     owner: int = -1
     """(int): Player port of the projectile's owner. -1 for no owner"""
-    type: enums.ProjectileType = enums.ProjectileType.UNKNOWN_PROJECTILE
+    type: enums.ProjectileType | UnknownProjectileType = enums.ProjectileType.UNKNOWN_PROJECTILE
     """(enums.ProjectileType): Which actual projectile type this is"""
-    frame: int = 0
+    expiration_frames: float = 0
     """(int): How long the item has been out"""
     subtype: int = 0
     """(int): The subtype of the item. Many projectiles have 'subtypes' that make them different. They're all different, so it's not an enum"""
+    spawn_id: np.uint32 = np.uint32(0)
 
 def port_detector(gamestate, character, costume):
     """Autodiscover what port the given character is on
