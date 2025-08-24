@@ -69,8 +69,8 @@ def default_dolphin_install_path() -> str:
         slippi_launcher = os.path.join(
             home, 'Library', 'Application Support', 'Slippi Launcher')
         options = [
-            'netplay/Slippi Dolphin.app',
             'netplay-beta/Slippi_Dolphin.app',
+            'netplay/Slippi Dolphin.app',
         ]
         for option in options:
             path = os.path.join(slippi_launcher, option)
@@ -83,13 +83,25 @@ def default_dolphin_install_path() -> str:
 
     raise NotImplementedError(f"Unsupported OS '{os_name}'")
 
+def _is_mainline(path: str) -> bool:
+    if 'netplay-beta' in path:
+        return True
+    if 'netplay' not in path:
+        raise ValueError(f"Unknown path '{path}'")
+    return False
+
 def _default_home_path(path: str) -> str:
-    if os.path.isfile(path):
-        raise NotImplementedError(
-            "Must specify dolphin install directory, not executable.")
+    # TODO: this function hasn't been tested in a while, some locations have moved
+    home = os.path.expanduser("~")
+    is_mainline = _is_mainline(path)
 
     if platform.system() == "Darwin":
-        return path + "/Contents/Resources/User/"
+        return os.path.join(
+            home, "Library", "Application Support",
+            "com.project-slippi.dolphin",
+            "netplay-beta" if is_mainline else "netplay",
+            "User"
+        )
 
     # Next check if the home path is in the same dir as the exe
     user_path = path + "/User/"
@@ -98,7 +110,7 @@ def _default_home_path(path: str) -> str:
 
     # Otherwise, this must be an appimage install. Use the .config
     if platform.system() == "Linux":
-        return str(Path.home()) + "/.config/SlippiOnline/"
+        return os.path.join(home, ".config", "SlippiOnline")
 
     raise FileNotFoundError("Could not find dolphin home directory.")
 
@@ -116,15 +128,17 @@ def get_exe_path(path: str) -> str:
     if os.path.isfile(path):
         return path
 
+    is_mainline = _is_mainline(path)
+
     exe_path = [path]
     if platform.system() == "Darwin":
-        exe_path.append("Contents/MacOS")
+        exe_path.extend(["Contents", "MacOS"])
 
     if platform.system() == "Windows":
         exe_name = "Slippi Dolphin.exe"
     elif platform.system() == "Darwin":
         # TODO: exe name varies between Ishiiruka and mainline
-        exe_name = "Slippi Dolphin"
+        exe_name = "Slippi_Dolphin" if is_mainline else "Slippi Dolphin"
     else: # Linux
         exe_name = "dolphin-emu"
 
