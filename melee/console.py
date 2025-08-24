@@ -782,6 +782,7 @@ class Console:
 
         if self._temp_gamestate is None:
             self._temp_gamestate = GameState()
+            self._events_this_frame = []
 
         frame_ended = False
         while not frame_ended:
@@ -893,12 +894,11 @@ class Console:
                 logging.warning("Something went wrong unpacking events. Data is probably missing")
                 return False
 
+            self._events_this_frame.append(event_type)
+
             # Big switch over event_type
 
-            if event_type == EventType.FRAME_START:
-                pass
-
-            elif event_type == EventType.GAME_START:
+            if event_type == EventType.GAME_START:
                 self.__game_start(gamestate, event_bytes)
                 # The game needs to know what to press on the first frame of the game
                 #   Just give it empty input. Characters are not actionable anyway.
@@ -908,6 +908,9 @@ class Console:
 
             elif event_type == EventType.GAME_END:
                 return self._use_manual_bookends
+
+            elif event_type == EventType.FRAME_START:
+                pass
 
             elif event_type == EventType.PRE_FRAME:
                 self.__pre_frame(gamestate, event_bytes)
@@ -933,6 +936,9 @@ class Console:
                     if self.blocking_input:
                         for controller in self.controllers:
                             controller.flush()
+
+                    self._temp_gamestate = GameState()
+                    self._events_this_frame = []
                     return False
                 self._frame = gamestate.frame
                 return True
@@ -1010,6 +1016,8 @@ class Console:
                 self._connect_codes[i] = connect_code.replace(shift_jis_hash, '#')
 
     def __pre_frame(self, gamestate: GameState, event_bytes):
+        gamestate.frame = np.ndarray((1,), ">i", event_bytes, 0x1)[0]
+
         # Grab the physical controller state and put that into the controller state
         controller_port = np.ndarray((1,), ">B", event_bytes, 0x5)[0] + 1
 
@@ -1070,7 +1078,7 @@ class Console:
     def __post_frame(self, gamestate: GameState, event_bytes):
         gamestate.stage = self._current_stage
         gamestate.is_teams = self._is_teams
-        gamestate.frame = np.ndarray((1,), ">i", event_bytes, 0x1)[0]
+        assert gamestate.frame == np.ndarray((1,), ">i", event_bytes, 0x1)[0]
         controller_port = np.ndarray((1,), ">B", event_bytes, 0x5)[0] + 1
 
         if controller_port not in gamestate.players:
