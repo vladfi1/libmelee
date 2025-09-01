@@ -1034,13 +1034,15 @@ class Console:
         playerstate.cpu_level = self._cpu_level[controller_port-1]
         playerstate.team_id = self._team_id[controller_port-1]
 
+        controller_state = playerstate.controller_state
+
         main_x = (np.ndarray((1,), ">f", event_bytes, 0x19)[0] / 2) + 0.5
         main_y = (np.ndarray((1,), ">f", event_bytes, 0x1D)[0] / 2) + 0.5
-        playerstate.controller_state.main_stick = (main_x, main_y)
+        controller_state.main_stick = (main_x, main_y)
 
         c_x = (np.ndarray((1,), ">f", event_bytes, 0x21)[0] / 2) + 0.5
         c_y = (np.ndarray((1,), ">f", event_bytes, 0x25)[0] / 2) + 0.5
-        playerstate.controller_state.c_stick = (c_x, c_y)
+        controller_state.c_stick = (c_x, c_y)
 
         raw_main_x = 0  # Added in 1.2.0
         raw_main_y = 0  # Added in 3.15.0
@@ -1052,26 +1054,37 @@ class Console:
             raw_main_y = int(np.ndarray((1,), ">b", event_bytes, 0x40)[0])
         except TypeError:
             pass
-        playerstate.controller_state.raw_main_stick = (raw_main_x, raw_main_y)
+        controller_state.raw_main_stick = (raw_main_x, raw_main_y)
 
         # The game interprets both shoulders together, so the processed value will always be the same
         trigger = (np.ndarray((1,), ">f", event_bytes, 0x29)[0])
-        playerstate.controller_state.l_shoulder = trigger
-        playerstate.controller_state.r_shoulder = trigger
+        controller_state.l_shoulder = trigger
+        controller_state.r_shoulder = trigger
 
-        buttonbits = np.ndarray((1,), ">H", event_bytes, 0x31)[0]
-        playerstate.controller_state.button[enums.Button.BUTTON_A] = bool(int(buttonbits) & 0x0100)
-        playerstate.controller_state.button[enums.Button.BUTTON_B] = bool(int(buttonbits) & 0x0200)
-        playerstate.controller_state.button[enums.Button.BUTTON_X] = bool(int(buttonbits) & 0x0400)
-        playerstate.controller_state.button[enums.Button.BUTTON_Y] = bool(int(buttonbits) & 0x0800)
-        playerstate.controller_state.button[enums.Button.BUTTON_START] = bool(int(buttonbits) & 0x1000)
-        playerstate.controller_state.button[enums.Button.BUTTON_Z] = bool(int(buttonbits) & 0x0010)
-        playerstate.controller_state.button[enums.Button.BUTTON_R] = bool(int(buttonbits) & 0x0020)
-        playerstate.controller_state.button[enums.Button.BUTTON_L] = bool(int(buttonbits) & 0x0040)
-        playerstate.controller_state.button[enums.Button.BUTTON_D_LEFT] = bool(int(buttonbits) & 0x0001)
-        playerstate.controller_state.button[enums.Button.BUTTON_D_RIGHT] = bool(int(buttonbits) & 0x0002)
-        playerstate.controller_state.button[enums.Button.BUTTON_D_DOWN] = bool(int(buttonbits) & 0x0004)
-        playerstate.controller_state.button[enums.Button.BUTTON_D_UP] = bool(int(buttonbits) & 0x0008)
+        def parse_button_bits(button: dict, bits: int) -> int:
+            button[enums.Button.BUTTON_A] = bool(bits & 0x0100)
+            button[enums.Button.BUTTON_B] = bool(bits & 0x0200)
+            button[enums.Button.BUTTON_X] = bool(bits & 0x0400)
+            button[enums.Button.BUTTON_Y] = bool(bits & 0x0800)
+            button[enums.Button.BUTTON_START] = bool(bits & 0x1000)
+            button[enums.Button.BUTTON_Z] = bool(bits & 0x0010)
+            button[enums.Button.BUTTON_R] = bool(bits & 0x0020)
+            button[enums.Button.BUTTON_L] = bool(bits & 0x0040)
+            button[enums.Button.BUTTON_D_LEFT] = bool(bits & 0x0001)
+            button[enums.Button.BUTTON_D_RIGHT] = bool(bits & 0x0002)
+            button[enums.Button.BUTTON_D_DOWN] = bool(bits & 0x0004)
+            button[enums.Button.BUTTON_D_UP] = bool(bits & 0x0008)
+
+        # physical buttons
+        parse_button_bits(
+            controller_state.button,
+            int(np.ndarray((1,), ">H", event_bytes, 0x31)[0]))
+
+        # processed buttons
+        button_bits = int(np.ndarray((1,), ">I", event_bytes, 0x2D)[0])
+        parse_button_bits(controller_state.processed_button, button_bits)
+        # there are a few more things in the processed buttons
+
         if self._use_manual_bookends:
             self._frame = gamestate.frame
 

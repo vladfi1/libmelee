@@ -1,5 +1,6 @@
 """ Defines a Clontroller class that manages pressing buttons for your console"""
 
+import dataclasses
 import platform
 import copy
 import time
@@ -28,39 +29,44 @@ def fix_analog_trigger(x: float) -> float:
     fudged = raw + 0.1  # Go slightly above the threshold to avoid rounding issues
     return fudged / 255  # Desired input value in [0, 1]
 
+_POSSIBLE_BUTTONS = [
+    enums.Button.BUTTON_A,
+    enums.Button.BUTTON_B,
+    enums.Button.BUTTON_X,
+    enums.Button.BUTTON_Y,
+    enums.Button.BUTTON_Z,
+    enums.Button.BUTTON_L,
+    enums.Button.BUTTON_R,
+    enums.Button.BUTTON_START,
+    enums.Button.BUTTON_D_UP,
+    enums.Button.BUTTON_D_DOWN,
+    enums.Button.BUTTON_D_LEFT,
+    enums.Button.BUTTON_D_RIGHT,
+]
 
+_new_buttons = lambda: {b: False for b in _POSSIBLE_BUTTONS}
+_field = lambda f: dataclasses.field(default_factory=f)
+
+@dataclasses.dataclass(slots=True)
 class ControllerState:
     """A snapshot of the state of a virtual controller"""
 
-    def __init__(self):
-        __slots__ = ('button', 'main_stick', 'c_stick', 'l_shoulder', 'r_shoulder')
-        self.button = dict()
-        """(dict of enums.Button to bool): For the each Button as key, tells you if the button is pressed."""
-        #Boolean buttons
-        self.button[enums.Button.BUTTON_A] = False
-        self.button[enums.Button.BUTTON_B] = False
-        self.button[enums.Button.BUTTON_X] = False
-        self.button[enums.Button.BUTTON_Y] = False
-        self.button[enums.Button.BUTTON_Z] = False
-        self.button[enums.Button.BUTTON_L] = False
-        self.button[enums.Button.BUTTON_R] = False
-        self.button[enums.Button.BUTTON_START] = False
-        self.button[enums.Button.BUTTON_D_UP] = False
-        self.button[enums.Button.BUTTON_D_DOWN] = False
-        self.button[enums.Button.BUTTON_D_LEFT] = False
-        self.button[enums.Button.BUTTON_D_RIGHT] = False
-        #Analog sticks
-        self.main_stick = (.5, .5)
-        """(pair of floats): The main stick's x,y position. Ranges from 0->1, 0.5 is neutral"""
-        self.c_stick = (.5, .5)
-        """(pair of floats): The C stick's x,y position. Ranges from 0->1, 0.5 is neutral"""
-        self.raw_main_stick: tuple[int, int] = (0, 0)
-        """(pair of ints): The raw unprocessed main stick coordinates. Ranges from -128 -> 127. 0 is neutral."""
-        #Analog shoulders
-        self.l_shoulder = 0
-        """(float): L shoulder analog press. Ranges from 0 (not pressed) to 1 (fully pressed)"""
-        self.r_shoulder = 0
-        """(float): R shoulder analog press. Ranges from 0 (not pressed) to 1 (fully pressed)"""
+    #Boolean buttons
+    """(dict of enums.Button to bool): For the each Button as key, tells you if the button is pressed."""
+    button: dict[enums.Button, bool] = _field(_new_buttons)
+    processed_button: dict[enums.Button, bool] = _field(_new_buttons)
+    #Analog sticks
+    """(pair of floats): The main stick's x,y position. Ranges from 0->1, 0.5 is neutral"""
+    main_stick: tuple[float, float] = (0.5, 0.5)
+    """(pair of floats): The C stick's x,y position. Ranges from 0->1, 0.5 is neutral"""
+    c_stick: tuple[float, float] = (0.5, 0.5)
+    """(pair of ints): The raw unprocessed main stick coordinates. Ranges from -128 -> 127. 0 is neutral."""
+    raw_main_stick: tuple[int, int] = (0, 0)
+    #Analog shoulders
+    l_shoulder: float = 0
+    """(float): L shoulder analog press. Ranges from 0 (not pressed) to 1 (fully pressed)"""
+    r_shoulder: float = 0
+    """(float): R shoulder analog press. Ranges from 0 (not pressed) to 1 (fully pressed)"""
 
     def __str__(self):
         string = ""
