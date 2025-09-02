@@ -1107,10 +1107,11 @@ class Console:
         playerstate.position.y = np.ndarray((1,), ">f", event_bytes, 0xe)[0]
 
         playerstate.character = enums.Character(np.ndarray((1,), ">B", event_bytes, 0x7)[0])
+        action_value = np.ndarray((1,), ">H", event_bytes, 0x8)[0]
         try:
-            playerstate.action = enums.Action(np.ndarray((1,), ">H", event_bytes, 0x8)[0])
+            playerstate.action = enums.Action(action_value)
         except ValueError:
-            playerstate.action = enums.Action.UNKNOWN_ANIMATION
+            playerstate.action = gamestate_lib.UnknownAnimation(action_value)
 
         # Melee stores this in a float for no good reason. So we have to convert
         playerstate.facing = np.ndarray((1,), ">f", event_bytes, 0x12)[0] > 0

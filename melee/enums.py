@@ -674,7 +674,6 @@ class Action(Enum):
     KIRBY_STONE_FORMING_AIR = 0x18C
     KIRBY_STONE_FALLING = 0x18D
     KIRBY_STONE_UNFORMING = 0x18D
-    UNKNOWN_ANIMATION = 0xffff
 
 # Complete list at: https://docs.google.com/spreadsheets/d/1JX2w-r2fuvWuNgGb6D3Cs4wHQKLFegZe2jhbBuIhCG8/edit?gid=20#gid=20
 class ProjectileType(Enum):

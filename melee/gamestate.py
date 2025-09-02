@@ -104,6 +104,10 @@ class GameState:
     """(dict): Custom fields to be added by the user"""
 
 @dataclass(slots=True)
+class UnknownAnimation:
+    value: int = -1
+
+@dataclass(slots=True)
 class PlayerState:
     """ Represents the state of a single player """
     # This value is what the character currently is IN GAME
@@ -127,7 +131,7 @@ class PlayerState:
     """(int): The player's remaining stock count"""
     facing: bool = True
     """(bool): Is the character facing right? (left is False). Characters in Melee must always be facing left or right"""
-    action: enums.Action = enums.Action.UNKNOWN_ANIMATION
+    action: enums.Action | UnknownAnimation = field(default_factory=UnknownAnimation)
     """(enum.Action): The current action (or animation) the character is in"""
     action_frame: int = 0
     """(int): What frame of the Action is the character in? Indexed from 1."""
