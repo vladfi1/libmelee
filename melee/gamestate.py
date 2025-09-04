@@ -121,7 +121,7 @@ class PlayerState:
     character_selected: enums.Character = enums.Character.UNKNOWN_CHARACTER
     position: Position = field(default_factory=Position)
     """(Position): x, y character position"""
-    percent: int = 0
+    percent: float = 0
     """(int): The player's damage"""
     shield_strength: float = 60.
     """(float): The player's shield strength (max 60). Shield breaks at 0"""

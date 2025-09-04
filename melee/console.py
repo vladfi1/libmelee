@@ -1116,7 +1116,7 @@ class Console:
         # Melee stores this in a float for no good reason. So we have to convert
         playerstate.facing = np.ndarray((1,), ">f", event_bytes, 0x12)[0] > 0
 
-        playerstate.percent = int(np.ndarray((1,), ">f", event_bytes, 0x16)[0])
+        playerstate.percent = np.ndarray((1,), ">f", event_bytes, 0x16)[0]
         playerstate.shield_strength = np.ndarray((1,), ">f", event_bytes, 0x1A)[0]
         playerstate.stock = np.ndarray((1,), ">B", event_bytes, 0x21)[0]
         playerstate.action_frame = int(np.ndarray((1,), ">f", event_bytes, 0x22)[0])
