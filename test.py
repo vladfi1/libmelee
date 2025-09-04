@@ -30,7 +30,7 @@ class SLPFile(unittest.TestCase):
             if gamestate.frame == 297:
                 self.assertEqual(gamestate.players[1].action.value, 0)
                 self.assertEqual(gamestate.players[2].action.value, 27)
-                self.assertEqual(gamestate.players[1].percent, 17)
+                self.assertEqual(int(gamestate.players[1].percent), 17)
                 self.assertEqual(gamestate.players[2].percent, 0)
 
 
@@ -56,7 +56,7 @@ class SLPFile(unittest.TestCase):
             if gamestate.frame == 301:
                 self.assertEqual(gamestate.players[2].action.value, 88)
                 self.assertEqual(gamestate.players[3].action.value, 56)
-                self.assertEqual(gamestate.players[2].percent, 25)
+                self.assertEqual(int(gamestate.players[2].percent), 25)
                 self.assertEqual(gamestate.players[3].percent, 0)
 
     def test_framedata(self):
