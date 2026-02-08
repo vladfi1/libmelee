@@ -76,7 +76,8 @@ def default_dolphin_install_path() -> tuple[str, bool]:
     settings_path = os.path.join(slippi_launcher, 'Settings')
     with open(settings_path, 'r') as f:
         settings = json.load(f)
-    is_mainline = settings["settings"]["useNetplayBeta"]
+    # Note: some users might be missing this flag.
+    is_mainline = settings["settings"].get("useNetplayBeta", False)
 
     path = os.path.join(slippi_launcher, "netplay-beta" if is_mainline else "netplay")
     if os.path.isdir(path):
