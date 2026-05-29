@@ -10,6 +10,7 @@ from melee.controller import Controller
 from melee.gamestate import GameState
 from melee import enums
 
+
 class MenuHelper():
 
     def __init__(self) -> None:
@@ -31,7 +32,8 @@ class MenuHelper():
         controller: Controller,
         character_selected: enums.Character,
         stage_selected: enums.Stage,
-        connect_code: str = "",
+        direct_code: str = "",
+        teams_code: str = "",
         cpu_level: int = 0,
         costume: int = 0,
         autostart: bool = False,
@@ -48,7 +50,8 @@ class MenuHelper():
             controller (controller.Controller): A Controller object that the bot will press buttons on
             character_selected (enums.Character): The character your bot will play as
             stage_selected (enums.Stage): The stage your bot will choose to play on
-            connect_code (str): The connect code to direct match with. Leave blank for VS mode.
+            direct_code (str): The connect code to direct match with. Leave blank along with teams_code for VS mode.
+            teams_code (str): The connect code to teams match with. Leave blank along with direct_code for VS mode.
             cpu_level (int): What CPU level to set this to. 0 for human/bot controlled.
             costume (int): Costume index chosen
             autostart (bool): Automatically start the game when it's ready.
@@ -57,16 +60,20 @@ class MenuHelper():
             frozen_stadium (bool): Whether to use Frozen Stadium as the stage.
                 Only makes sense for Slippi >= 3.19.0.
         """
-        if connect_code and not controller._console.has_user_json:
-            raise ValueError("Can't enter a connect code without a user.json configured.")
+        code = direct_code or teams_code
+        if direct_code and teams_code:
+            raise ValueError("Can't pass both direct and teams code. Must choose one.")
+        if code and not controller._console.has_user_json:
+            raise ValueError("Can't enter a direct/teams code without a user.json configured.")
 
         # If we're at the character select screen, choose our character
         if gamestate.menu_state in [enums.Menu.CHARACTER_SELECT, enums.Menu.SLIPPI_ONLINE_CSS]:
             if gamestate.submenu == enums.SubMenu.NAME_ENTRY_SUBMENU:
-                self.enter_direct_code(
+                self.enter_code(
                     gamestate=gamestate,
                     controller=controller,
-                    connect_code=connect_code)
+                    code=code)
+                    
             else:
                 # We've exited the name entry screen, so reset the state in case we go back
                 self.name_tag_index = 0
@@ -77,7 +84,7 @@ class MenuHelper():
                     gamestate=gamestate,
                     controller=controller,
                     cpu_level=cpu_level,
-                    costume=costume,
+                    costume=(-1 if teams_code else costume),
                     swag=swag,
                     start=autostart)
         # If we're at the postgame scores screen, spam START
@@ -92,19 +99,21 @@ class MenuHelper():
                               frozen_stadium=frozen_stadium,
                               autostart=autostart)
         elif gamestate.menu_state == enums.Menu.MAIN_MENU:
-            if connect_code:
-                self.choose_direct_online(gamestate=gamestate, controller=controller)
+            if direct_code:
+                self.choose_online_mode(gamestate=gamestate, controller=controller, direct=True)
+            elif teams_code:
+                self.choose_online_mode(gamestate=gamestate, controller=controller, direct=False)
             else:
                 self.choose_versus_mode(gamestate=gamestate, controller=controller)
 
-    def enter_direct_code(
-            self, gamestate: GameState, controller: Controller, connect_code: str):
+    def enter_code(
+            self, gamestate: GameState, controller: Controller, code: str):
         """At the nametag entry screen, enter the given direct connect code and exit
 
         Args:
             gamestate (gamestate.GameState): The current GameState for this frame
             controller (controller.Controller): A Controller object to press buttons on
-            connect_code (str): The connect code to direct match with. Leave blank for VS mode.
+            code (str): The connect code to direct or teams match with. Leave blank for VS mode.
             index (int): Current name tag index
 
         Returns:
@@ -125,11 +134,11 @@ class MenuHelper():
             controller.release_all()
             return
 
-        if len(connect_code) == self.name_tag_index:
+        if len(code) == self.name_tag_index:
             controller.press_button(enums.Button.BUTTON_START)
             return
 
-        target_character = connect_code[self.name_tag_index]
+        target_character = code[self.name_tag_index]
         target_code = 45
         column = "ABCDEFGHIJ".find(target_character)
         if column != -1:
@@ -375,7 +384,7 @@ class MenuHelper():
             if gamestate.frame % 2 == 0:
                 controller.release_all()
                 return
-            if costume == ai_state.costume:
+            if costume == -1 or costume == ai_state.costume:
                 controller.press_button(enums.Button.BUTTON_START)
             else:
                 controller.press_button(enums.Button.BUTTON_Y)
@@ -664,29 +673,30 @@ class MenuHelper():
             controller.release_all()
 
     @staticmethod
-    def choose_direct_online(gamestate: GameState, controller: Controller):
+    def choose_online_mode(gamestate: GameState, controller: Controller, direct=True):
         """Helper function to bring us into the direct connect online menu
 
         Args:
             gamestate (gamestate.GameState): The current gamestate
             controller (controller.Controller): The controller to press buttons on
+            direct (bool): Whether to choose direct or teams mode
         """
         # Let the controller go every other frame. Makes the logic below easier
         if gamestate.frame % 2 == 0:
             controller.release_all()
             return
+
+        menu = 2 if direct else 3
         if gamestate.menu_state == enums.Menu.MAIN_MENU:
             if gamestate.submenu == enums.SubMenu.ONLINE_PLAY_SUBMENU:
-                if gamestate.menu_selection == 2:
-                    controller.press_button(enums.Button.BUTTON_A)
-                elif gamestate.menu_selection == 3:
+                if gamestate.menu_selection == menu:
                     controller.press_button(enums.Button.BUTTON_A)
                 else:
                     controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, 0)
             elif gamestate.submenu == enums.SubMenu.MAIN_MENU_SUBMENU:
                 controller.press_button(enums.Button.BUTTON_A)
             elif gamestate.submenu == enums.SubMenu.ONEP_MODE_SUBMENU:
-                if gamestate.menu_selection == 2:
+                if gamestate.menu_selection == menu:
                     controller.press_button(enums.Button.BUTTON_A)
                 else:
                     controller.tilt_analog(enums.Button.BUTTON_MAIN, .5, 0)
