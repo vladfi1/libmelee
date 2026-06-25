@@ -128,6 +128,8 @@ def default_dolphin_info() -> DolphinInfo:
     if not os.path.isdir(path):
         raise FileNotFoundError("Could not find dolphin install directory.")
 
+    logging.info(f'Found dolphin install dir at {path}')
+
     home_path = _default_home_path(path, is_mainline)
 
     iso_path = settings["settings"].get("isoPath", None)
@@ -192,6 +194,8 @@ def get_exe_path(path: str) -> str:
 
     if not os.path.isfile(exe_path):
         raise FileNotFoundError(f'Could not find dolphin executable at {exe_path}')
+
+    logging.info(f'Found dolphin executable at {exe_path}')
 
     return exe_path
 
@@ -494,6 +498,7 @@ class Console:
                     self.is_mainline = self.dolphin_info.is_mainline
                     if self.dolphin_home_path is None:
                         self.dolphin_home_path = self.dolphin_info.home_path
+                    logging.info('Using automatically detected dolphin install at ' + self.path)
 
                 self.exe_path = get_exe_path(self.path)
                 self.dolphin_version = get_dolphin_version(self.exe_path)
@@ -617,6 +622,8 @@ class Console:
         if iso_path is not None:
             command.append("-e")
             command.append(iso_path)
+        else:
+            logging.warning('No ISO provided or found')
 
         dolphin_user_path = dolphin_user_path or self._get_dolphin_home_path()
         command.append("-u")
@@ -632,6 +639,7 @@ class Console:
         if environment_vars is not None:
             env.update(environment_vars)
 
+        logging.info(f'Running dolphin: "{" ".join(command)}"')
         self._process = subprocess.Popen(command, env=env)
 
     def stop(self):
