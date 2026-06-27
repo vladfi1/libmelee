@@ -33,6 +33,20 @@ from melee.slpfilestreamer import SLPFileStreamer
 from melee import stages
 
 
+# All Dolphin log type short names, from
+# Source/Core/Common/Logging/LogManager.cpp (the first string of each m_log entry).
+ALL_LOG_TYPES = [
+    "Achievements", "ActionReplay", "Audio", "AI", "BOOT", "CP", "COMMON",
+    "CONSOLE", "CI", "CORE", "DIO", "DSPHLE", "DSPLLE", "DSPMails", "DSP",
+    "DVD", "JIT", "EXI", "FileMon", "FRAMEDUMP", "GDB_STUB", "GP", "Host GPU",
+    "HSP", "IOS", "IOS_DI", "IOS_ES", "IOS_FS", "IOS_SD", "IOS_SSL", "IOS_STM",
+    "IOS_NET", "IOS_USB", "IOS_WC24", "IOS_WFS", "IOS_WIIMOTE", "MASTER",
+    "MemCard Manager", "MI", "NETPLAY", "HLE", "OSREPORT", "OSREPORT_HLE",
+    "PE", "PI", "PowerPC", "SI", "SLIPPI", "SLIPPI_ONLINE",
+    "SLIPPI_RUST_DEPENDENCIES", "SLIPPI_RUST_ONLINE", "SLIPPI_RUST_JUKEBOX",
+    "SP1", "SYMBOLS", "Video", "VI", "Wiimote", "WII_IPC",
+]
+
 class SlippiVersionTooLow(Exception):
     """Raised when the Slippi version is not recent enough"""
     def __init__(self, message):
@@ -398,6 +412,8 @@ class Console:
             user_json_path (str): Path to custom user.json for netplay. Doesn't work on
                 Mac as the path is hardcoded.
             log_level (int): Dolphin log level.
+            log_types (list[str]): Dolphin log categories to enable, by short name
+                (e.g. 'SLIPPI', 'NETPLAY'). Pass ['ALL'] to enable every log type.
             infinite_time (bool): Set the game to infinite time mode.
             instant_match_restart: (bool): Whether to instantly restart matches when they end.
                 This will pick a random legal stage to restart to.
@@ -763,7 +779,8 @@ class Console:
         logger_config.set("Options", "WriteToFile", "True")
         logger_config.set("Options", "Verbosity", str(self.log_level))
 
-        for log_type in self.log_types:
+        log_types = ALL_LOG_TYPES if 'ALL' in self.log_types else self.log_types
+        for log_type in log_types:
             logger_config.set("Logs", log_type, "True")
 
         with open(logger_ini_path, 'w') as f:
