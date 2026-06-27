@@ -565,7 +565,13 @@ class Console:
         Returns:
             True is successful, False otherwise
         """
-        return self._slippstream.connect()
+        connected = self._slippstream.connect()
+
+        if not connected and self._process is not None:
+            if self._process.poll() is not None:
+                logging.error(f'Dolphin process terminated with code {self._process.returncode}')
+
+        return connected
 
     def _get_dolphin_home_path(self):
         """Return the path to dolphin's home directory"""
