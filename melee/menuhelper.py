@@ -31,7 +31,7 @@ class MenuHelper():
         controller: Controller,
         character_selected: enums.Character,
         stage_selected: enums.Stage,
-        connect_code: str = "",
+        connect_code: Optional[str] = None,
         cpu_level: int = 0,
         costume: int = 0,
         autostart: bool = False,
@@ -48,7 +48,7 @@ class MenuHelper():
             controller (controller.Controller): A Controller object that the bot will press buttons on
             character_selected (enums.Character): The character your bot will play as
             stage_selected (enums.Stage): The stage your bot will choose to play on
-            connect_code (str): The connect code to direct match with. Leave blank for VS mode.
+            connect_code (Optional[str]): The connect code to direct match with. Leave blank for VS mode.
             cpu_level (int): What CPU level to set this to. 0 for human/bot controlled.
             costume (int): Costume index chosen
             autostart (bool): Automatically start the game when it's ready.
@@ -63,10 +63,11 @@ class MenuHelper():
         # If we're at the character select screen, choose our character
         if gamestate.menu_state in [enums.Menu.CHARACTER_SELECT, enums.Menu.SLIPPI_ONLINE_CSS]:
             if gamestate.submenu == enums.SubMenu.NAME_ENTRY_SUBMENU:
-                self.enter_direct_code(
-                    gamestate=gamestate,
-                    controller=controller,
-                    connect_code=connect_code)
+                if connect_code is not None:
+                    self.enter_direct_code(
+                        gamestate=gamestate,
+                        controller=controller,
+                        connect_code=connect_code)
             else:
                 # We've exited the name entry screen, so reset the state in case we go back
                 self.name_tag_index = 0
