@@ -361,6 +361,7 @@ class Console:
                  audio_backend: str = "",
                  overclock: Optional[float] = None,
                  emulation_speed: float = 1.0,
+                 background_input: bool = True,
                  save_replays: bool = True,
                  replay_dir: Optional[str] = None,
                  replay_monthly_folders: Optional[bool] = None,
@@ -409,6 +410,7 @@ class Console:
                 this in my experiments.
             emulation_speed (float): Speed the game runs at. Set to 0 for unlimited speed.
                 Only works with mainline dolphin, Ishiiruka ignores this option.
+            background_input (bool): Allow input to dolphin when it is not the focused window.
             save_replays (bool): Save slippi replays.
             replay_dir (str): Directory to save replays to. Defaults to "~/Slippi".
             user_json_path (str): Path to custom user.json for netplay. Doesn't work on
@@ -479,6 +481,7 @@ class Console:
         self.audio_backend = audio_backend
         self.overclock = overclock
         self.emulation_speed = emulation_speed
+        self.background_input = background_input
         self.save_replays = save_replays
         self.replay_dir = replay_dir
         self.replay_monthly_folders = replay_monthly_folders
@@ -757,13 +760,14 @@ class Console:
           if self.replay_monthly_folders is not None:
               config.set("Core", "SlippiReplayMonthlyFolders", str(self.replay_monthly_folders))
 
-        # Turn on background input so we don't need to have window focus on dolphin
-        config.set("Input", 'backgroundinput', "True")
         # None keeps the existing (e.g. copied) setting.
         if self.gfx_backend is not None:
             config.set("Core", "GFXBackend", self.gfx_backend)
         if self.fullscreen is not None:
             config.set("Display", "Fullscreen", str(self.fullscreen))
+
+        config.set("Input", 'backgroundinput', str(self.background_input))
+
         if self.disable_audio:
             disable_str = "No Audio Output" if self.is_mainline else "No audio output"
             config.set("DSP", "Backend", disable_str)
