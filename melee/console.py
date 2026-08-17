@@ -745,7 +745,7 @@ class Console:
               config.set("Core", "SlippiReplayMonthlyFolders", str(self.replay_monthly_folders))
 
         # Turn on background input so we don't need to have window focus on dolphin
-        # config.set("Input", 'backgroundinput', "True")
+        config.set("Input", 'backgroundinput', "False")
         config.set("Core", "GFXBackend", self.gfx_backend)
         config.set("Display", "Fullscreen", str(self.fullscreen))
         if self.disable_audio:
