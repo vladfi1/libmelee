@@ -355,8 +355,8 @@ class Console:
                  allow_old_version: bool = False,
                  logger=None,
                  setup_gecko_codes: bool = True,
-                 fullscreen: bool = True,
-                 gfx_backend: str = "",
+                 fullscreen: Optional[bool] = True,
+                 gfx_backend: Optional[str] = None,
                  disable_audio: bool = False,
                  audio_backend: str = "",
                  overclock: Optional[float] = None,
@@ -400,8 +400,10 @@ class Console:
             logger (logger.Logger): Logger instance to use. None for no logger.
             setup_gecko_codes (bool): Overwrites the user's GALE01r2.ini with libmelee's
                 custom gecko codes. Should be used with tmp_home_directory.
-            fullscreen (bool): Run melee fullscreen.
-            gfx_backend (str): Graphics backend. Leave blank to use default.
+            fullscreen (bool): Run melee fullscreen. None keeps the home
+                directory's setting, e.g. the user's with copy_home_directory.
+            gfx_backend (str): Graphics backend; "" for dolphin's default. None
+                keeps the home directory's setting.
             disable_audio (bool): Turn off sound.
             overclock (bool): Overclock the dolphin CPU. I haven't seen any benefit to
                 this in my experiments.
@@ -746,8 +748,11 @@ class Console:
 
         # Turn on background input so we don't need to have window focus on dolphin
         config.set("Input", 'backgroundinput', "True")
-        config.set("Core", "GFXBackend", self.gfx_backend)
-        config.set("Display", "Fullscreen", str(self.fullscreen))
+        # None keeps the existing (e.g. copied) setting.
+        if self.gfx_backend is not None:
+            config.set("Core", "GFXBackend", self.gfx_backend)
+        if self.fullscreen is not None:
+            config.set("Display", "Fullscreen", str(self.fullscreen))
         if self.disable_audio:
             disable_str = "No Audio Output" if self.is_mainline else "No audio output"
             config.set("DSP", "Backend", disable_str)
