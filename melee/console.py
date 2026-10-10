@@ -666,6 +666,17 @@ class Console:
         logging.info(f'Running dolphin: "{" ".join(command)}"')
         self._process = subprocess.Popen(command, env=env)
 
+    def interrupt(self):
+        """Makes a step() that is waiting on dolphin raise EnetDisconnected.
+
+        Thread-safe, so another thread can end a step() that would otherwise
+        wait forever, e.g. when dolphin's emulation was stopped but its window
+        is still open, so the connection stays up without sending frames.
+        Takes up to a second. Call stop() afterwards as usual.
+        """
+        if isinstance(self._slippstream, SlippstreamClient):
+            self._slippstream.interrupt()
+
     def stop(self):
         """ Stop the console.
 

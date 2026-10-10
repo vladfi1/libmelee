@@ -170,6 +170,14 @@ class SlippstreamClient:
             self._worker = None
         self.running = False
 
+    def interrupt(self):
+        """Makes a dispatch that is waiting for a message raise EnetDisconnected.
+
+        Thread-safe. The worker checks for this every second, then exits,
+        which closes the connection's pipe. Call shutdown() afterwards as usual.
+        """
+        self._shutdown.set()
+
     def dispatch(self, polling_mode: bool, timeout: float = 0):
         """Dispatch messages with the peer (read and write packets)"""
         assert self.running, "Can only dispatch while running."
