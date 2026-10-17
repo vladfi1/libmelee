@@ -362,7 +362,7 @@ class Console:
                  overclock: Optional[float] = None,
                  emulation_speed: float = 1.0,
                  background_input: bool = True,
-                 save_replays: bool = True,
+                 save_replays: Optional[bool] = True,
                  replay_dir: Optional[str] = None,
                  replay_monthly_folders: Optional[bool] = None,
                  user_json_path: Optional[str] = None,
@@ -411,7 +411,8 @@ class Console:
             emulation_speed (float): Speed the game runs at. Set to 0 for unlimited speed.
                 Only works with mainline dolphin, Ishiiruka ignores this option.
             background_input (bool): Allow input to dolphin when it is not the focused window.
-            save_replays (bool): Save slippi replays.
+            save_replays (bool): Save slippi replays. None keeps the home
+                directory's setting, e.g. the user's with copy_home_directory.
             replay_dir (str): Directory to save replays to. Defaults to "~/Slippi".
             user_json_path (str): Path to custom user.json for netplay. Doesn't work on
                 Mac as the path is hardcoded.
@@ -743,7 +744,8 @@ class Console:
           config.set("Slippi", 'OnlineDelay', str(self.online_delay))
           config.set("Slippi", 'BlockingPipes', str(self.blocking_input))
 
-          config.set("Slippi", "SaveReplays", str(self.save_replays))
+          if self.save_replays is not None:
+              config.set("Slippi", "SaveReplays", str(self.save_replays))
           if self.replay_dir:
               config.set("Slippi", "ReplayDir", self.replay_dir)
           if self.replay_monthly_folders is not None:
@@ -754,7 +756,8 @@ class Console:
           config.set("Core", 'SlippiOnlineDelay', str(self.online_delay))
           config.set("Core", 'BlockingPipes', str(self.blocking_input))
 
-          config.set("Core", "SlippiSaveReplays", str(self.save_replays))
+          if self.save_replays is not None:
+              config.set("Core", "SlippiSaveReplays", str(self.save_replays))
           if self.replay_dir:
               config.set("Core", "SlippiReplayDir", self.replay_dir)
           if self.replay_monthly_folders is not None:
