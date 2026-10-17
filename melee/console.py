@@ -863,8 +863,10 @@ class Console:
 
         #Add a bot standard controller config to the given port
         section = "GCPad" + str(port)
-        if not config.has_section(section):
-            config.add_section(section)
+        # Start from an empty section: settings left from a copied home
+        # directory, e.g. a keyboard's stick calibration, distort the bot's inputs.
+        config.remove_section(section)
+        config.add_section(section)
 
         if controllertype == enums.ControllerType.STANDARD:
             config.set(section, 'Device', 'Pipe/0/slippibot' + str(port))
